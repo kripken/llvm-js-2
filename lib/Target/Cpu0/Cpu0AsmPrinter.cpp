@@ -212,9 +212,21 @@ const char *Cpu0AsmPrinter::getCurrentABIString() const {
 //->		.ent	main                    # @main
 //	main:
 void Cpu0AsmPrinter::EmitFunctionEntryLabel() {
-  if (OutStreamer.hasRawTextSupport())
-    OutStreamer.EmitRawText("\t.ent\t" + Twine(CurrentFnSym->getName()));
-  OutStreamer.EmitLabel(CurrentFnSym);
+  std::string ArgString;
+  const Function::ArgumentListType &ArgList = MF->getFunction()->getArgumentList();
+  bool First = true;
+  for (Function::ArgumentListType::const_iterator iter = ArgList.begin();
+       iter != ArgList.end(); iter++) {
+    // TODO: probably need to map the frame indexes somehow
+    if (!First) {
+      ArgString += ", ";
+    }
+    First = false;
+    ArgString += "a";
+  }
+  OutStreamer.EmitRawText("function " + Twine(CurrentFnSym->getName()) + "(" +
+          ArgString + ") {");
+  //OutStreamer.EmitRawText("\t.ent\t" + Twine(CurrentFnSym->getName()));
 }
 
 
@@ -268,6 +280,7 @@ void Cpu0AsmPrinter::EmitFunctionBodyEnd() {
     OutStreamer.EmitRawText(StringRef("\t.set\tmacro"));
     OutStreamer.EmitRawText(StringRef("\t.set\treorder"));
     OutStreamer.EmitRawText("\t.end\t" + Twine(CurrentFnSym->getName()));
+    OutStreamer.EmitRawText(StringRef("}"));
   }
 }
 
