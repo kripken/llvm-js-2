@@ -239,6 +239,7 @@ void Cpu0AsmPrinter::EmitFunctionEntryLabel() {
 void Cpu0AsmPrinter::EmitFunctionBodyStart() {
   MCInstLowering.Initialize(Mang, &MF->getContext());
 
+#if 0
   emitFrameDirective();
   bool EmitCPLoad = (MF->getTarget().getRelocationModel() == Reloc::PIC_) &&
     Cpu0FI->globalBaseRegSet() &&
@@ -263,6 +264,7 @@ void Cpu0AsmPrinter::EmitFunctionBodyStart() {
        I != MCInsts.end(); ++I)
       OutStreamer.EmitInstruction(*I);
   }
+#endif
 }
 
 //->	.set	macro
@@ -271,6 +273,7 @@ void Cpu0AsmPrinter::EmitFunctionBodyStart() {
 /// EmitFunctionBodyEnd - Targets can override this to emit stuff after
 /// the last basic block in the function.
 void Cpu0AsmPrinter::EmitFunctionBodyEnd() {
+#if 0
   // There are instruction for this macros, but they must
   // always be at the function end, and we can't emit and
   // break with BB logic.
@@ -280,8 +283,9 @@ void Cpu0AsmPrinter::EmitFunctionBodyEnd() {
     OutStreamer.EmitRawText(StringRef("\t.set\tmacro"));
     OutStreamer.EmitRawText(StringRef("\t.set\treorder"));
     OutStreamer.EmitRawText("\t.end\t" + Twine(CurrentFnSym->getName()));
-    OutStreamer.EmitRawText(StringRef("}"));
   }
+#endif
+  OutStreamer.EmitRawText(StringRef("}"));
 }
 
 //	.section .mdebug.abi32
