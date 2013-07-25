@@ -72,6 +72,8 @@ def CPURegs : RegisterClass<"Cpu0", [i32], 32, (add
   GP, FP, 
   // Not preserved across procedure calls
   T0, 
+  // My new registers
+  R0, R1, R2, R3,
   // Reserved
   SP, LR, PC)>;
 

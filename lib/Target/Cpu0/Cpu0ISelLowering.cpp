@@ -427,18 +427,19 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       continue;
     }
 
-    // Register can't get to this point...
-    assert(VA.isMemLoc());
+    if (VA.isMemLoc()) {
+      // Create the frame index object for this incoming parameter
+      LastFI = MFI->CreateFixedObject(ValVT.getSizeInBits()/8,
+                                      VA.getLocMemOffset(), true);
+      SDValue PtrOff = DAG.getFrameIndex(LastFI, getPointerTy());
 
-    // Create the frame index object for this incoming parameter
-    LastFI = MFI->CreateFixedObject(ValVT.getSizeInBits()/8,
-                                    VA.getLocMemOffset(), true);
-    SDValue PtrOff = DAG.getFrameIndex(LastFI, getPointerTy());
-
-    // emit ISD::STORE whichs stores the
-    // parameter value to a stack Location
-    MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff,
-                                       MachinePointerInfo(), false, false, 0));
+      // emit ISD::STORE whichs stores the
+      // parameter value to a stack Location
+      MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff,
+                                         MachinePointerInfo(), false, false, 0));
+    } else {
+      RegsToPass.push_back(std::make_pair(VA.getLocReg(), Arg));
+    }
   }
 
   // Extend range of indices of frame objects for outgoing arguments that were
@@ -459,6 +460,12 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
                         &MemOpChains[0], MemOpChains.size());
 
+  SDValue InFlag;
+  for (unsigned i = 0, e = RegsToPass.size(); i != e; ++i) {
+    Chain = DAG.getCopyToReg(Chain, dl, RegsToPass[i].first, RegsToPass[i].second, InFlag);
+    InFlag = Chain.getValue(1);
+  }
+
   // If the callee is a GlobalAddress/ExternalSymbol node (quite common, every
   // direct call is) turn it into a TargetGlobalAddress/TargetExternalSymbol
   // node so that legalize doesn't hack it.
@@ -478,8 +485,6 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                                          OpFlag);
     GlobalOrExternal = true;
   }
-
-  SDValue InFlag;
 
   // T9 should contain the address of the callee function if
   // -reloction-model=pic or it is an indirect call.
@@ -632,6 +637,15 @@ Cpu0TargetLowering::LowerFormalArguments(SDValue Chain,
                    &*FuncArg);
       continue;
     }
+
+    if (VA.isRegLoc()) {
+      unsigned VReg = MF.getRegInfo().createVirtualRegister(getRegClassFor(MVT::i32));
+      MF.getRegInfo().addLiveIn(VA.getLocReg(), VReg);
+      SDValue Arg = DAG.getCopyFromReg(Chain, dl, VReg, MVT::i32);
+      InVals.push_back(Arg);
+      continue;
+    }
+
     // sanity check
     assert(VA.isMemLoc());
 

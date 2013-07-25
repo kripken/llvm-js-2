@@ -27,6 +27,7 @@ def CC_Cpu0EABI : CallingConv<[
   CCIfType<[i8, i16], CCPromoteToType<i32>>,
   // Integer values get stored in stack slots that are 4 bytes in
   // size and 4-byte aligned.
+  CCIfType<[i32], CCAssignToReg<[R0, R1, R2, R3]>>,
   CCIfType<[i32], CCAssignToStack<4, 4>>
 ]>;
 
