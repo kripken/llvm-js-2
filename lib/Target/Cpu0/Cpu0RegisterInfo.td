@@ -14,12 +14,12 @@
 
 // We have banks of 16 registers each.
 class Cpu0Reg<string n> : Register<n> {
-  field bits<4> Num;
+  field bits<5> Num;
   let Namespace = "Cpu0";
 }
 
 // Cpu0 CPU Registers
-class Cpu0GPRReg<bits<4> num, string n> : Cpu0Reg<n> {
+class Cpu0GPRReg<bits<5> num, string n> : Cpu0Reg<n> {
   let Num = num;
 }
 
@@ -45,8 +45,10 @@ let Namespace = "Cpu0" in {
   def SP   : Cpu0GPRReg< 13, "sp">,   DwarfRegNum<[13]>;
   def LR   : Cpu0GPRReg< 14, "lr">,   DwarfRegNum<[14]>;
   def PC   : Cpu0GPRReg< 15, "pc">,   DwarfRegNum<[15]>;
-//  def MAR  : Register< 16, "mar">,  DwarfRegNum<[16]>;
-//  def MDR  : Register< 17, "mdr">,  DwarfRegNum<[17]>;
+  def R0   : Cpu0GPRReg< 16, "r0">,   DwarfRegNum<[16]>;
+  def R1   : Cpu0GPRReg< 17, "r1">,   DwarfRegNum<[17]>;
+  def R2   : Cpu0GPRReg< 18, "r2">,   DwarfRegNum<[18]>;
+  def R3   : Cpu0GPRReg< 19, "r3">,   DwarfRegNum<[19]>;
 
   // Hi/Lo registers
   def HI   : Register<"hi">, DwarfRegNum<[18]>;
