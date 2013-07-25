@@ -330,10 +330,17 @@ class RetBase<RegisterClass RC>: JumpFR<0x2C, "return", RC> {
 }
 
 // Jump and Link (Call)
-let isCall=1, hasDelaySlot=0 in {
-  class JumpLink<bits<8> op, string instr_asm>:
+let isCall=1, hasDelaySlot=0, isCodeGenOnly=1 in {
+  class JumpLinkSwi<bits<8> op, string instr_asm>:
     FJ<op, (outs), (ins calltarget:$target, variable_ops),
        !strconcat(instr_asm, "\t$target"), [(Cpu0JmpLink imm:$target)],
+       IIBranch> {
+       let DecoderMethod = "DecodeJumpAbsoluteTarget";
+       }
+
+  class JumpLink<bits<8> op, string instr_asm>:
+    FJ<op, (outs), (ins calltarget:$target, variable_ops),
+       "/* " # instr_asm # " */\t${target}(${:arguments})", [(Cpu0JmpLink imm:$target)],
        IIBranch> {
        let DecoderMethod = "DecodeJumpAbsoluteTarget";
        }
@@ -504,7 +511,7 @@ def BNE     : CBranch<0x21, "bne", setne, CPURegs>;
 def JMP     : UncondBranch<0x26, "jmp">;
 
 /// Jump and Branch Instructions
-def SWI     : JumpLink<0x2A, "swi">;
+def SWI     : JumpLinkSwi<0x2A, "swi">;
 def JSUB    : JumpLink<0x2B, "jsub">;
 def JR      : JumpFR<0x2C, "return", CPURegs>;
 
