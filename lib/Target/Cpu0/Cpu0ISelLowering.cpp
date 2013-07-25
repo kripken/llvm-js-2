@@ -363,7 +363,6 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   MachineFunction &MF = DAG.getMachineFunction();
   MachineFrameInfo *MFI = MF.getFrameInfo();
   const TargetFrameLowering *TFL = MF.getTarget().getFrameLowering();
-  bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
   Cpu0FunctionInfo *Cpu0FI = MF.getInfo<Cpu0FunctionInfo>();
 
   // Analyze operands of the call, assigning locations to each operand.
@@ -376,10 +375,6 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // Get a count of how many bytes are to be pushed on the stack.
   unsigned NextStackOffset = CCInfo.getNextStackOffset();
 
-  // If this is the first call, create a stack frame object that points to
-  // a location to which .cprestore saves $gp.
-  if (IsPIC && Cpu0FI->globalBaseRegFixed() && !Cpu0FI->getGPFI())
-    Cpu0FI->setGPFI(MFI->CreateFixedObject(4, 0, true));
   // Get the frame index of the stack frame object that points to the location
   // of dynamically allocated area on the stack.
   int DynAllocFI = Cpu0FI->getDynAllocFI();
@@ -468,21 +463,17 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // direct call is) turn it into a TargetGlobalAddress/TargetExternalSymbol
   // node so that legalize doesn't hack it.
   unsigned char OpFlag;
-  bool IsPICCall = IsPIC; // true if calls are translated to jalr $25
   bool GlobalOrExternal = false;
   SDValue CalleeLo;
 
   if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee)) {
-    OpFlag = IsPICCall ? Cpu0II::MO_GOT_CALL : Cpu0II::MO_NO_FLAG;
+    OpFlag = Cpu0II::MO_NO_FLAG;
     Callee = DAG.getTargetGlobalAddress(G->getGlobal(), dl,
                                           getPointerTy(), 0, OpFlag);
     GlobalOrExternal = true;
   }
   else if (ExternalSymbolSDNode *S = dyn_cast<ExternalSymbolSDNode>(Callee)) {
-    if (!IsPIC) // static
-      OpFlag = Cpu0II::MO_NO_FLAG;
-    else // O32 & PIC
-      OpFlag = Cpu0II::MO_GOT_CALL;
+    OpFlag = Cpu0II::MO_NO_FLAG;
     Callee = DAG.getTargetExternalSymbol(S->getSymbol(), getPointerTy(),
                                          OpFlag);
     GlobalOrExternal = true;
@@ -490,28 +481,9 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   SDValue InFlag;
 
-  // Create nodes that load address of callee and copy it to T9
-  if (IsPICCall) {
-    if (GlobalOrExternal) {
-      // Load callee address
-      Callee = DAG.getNode(Cpu0ISD::Wrapper, dl, getPointerTy(),
-                           getGlobalReg(DAG, getPointerTy()), Callee);
-      SDValue LoadValue = DAG.getLoad(getPointerTy(), dl, DAG.getEntryNode(),
-                                      Callee, MachinePointerInfo::getGOT(),
-                                      false, false, false, 0);
-
-      // Use GOT+LO if callee has internal linkage.
-      if (CalleeLo.getNode()) {
-        SDValue Lo = DAG.getNode(Cpu0ISD::Lo, dl, getPointerTy(), CalleeLo);
-        Callee = DAG.getNode(ISD::ADD, dl, getPointerTy(), LoadValue, Lo);
-      } else
-        Callee = LoadValue;
-    }
-  }
-
   // T9 should contain the address of the callee function if
   // -reloction-model=pic or it is an indirect call.
-  if (IsPICCall || !GlobalOrExternal) {
+  if (!GlobalOrExternal) {
     // copy to T9
     unsigned T9Reg = Cpu0::T9;
     Chain = DAG.getCopyToReg(Chain, dl, T9Reg, Callee, SDValue(0, 0));
