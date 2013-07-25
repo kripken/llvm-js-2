@@ -187,7 +187,7 @@ def store_a         : AlignedStore<store>;
 class ArithLogicR<bits<8> op, string instr_asm, SDNode OpNode,
                   InstrItinClass itin, RegisterClass RC, bit isComm = 0>:
   FA<op, (outs RC:$ra), (ins RC:$rb, RC:$rc),
-     !strconcat(instr_asm, "\t$ra, $rb, $rc"),
+     "/* " # instr_asm # " */\t$ra = $rb " # instr_asm # " $rc",
      [(set RC:$ra, (OpNode RC:$rb, RC:$rc))], itin> {
   let shamt = 0;
   let isCommutable = isComm;	// e.g. add rb rc =  add rc rb
@@ -197,7 +197,7 @@ class ArithLogicR<bits<8> op, string instr_asm, SDNode OpNode,
 class ArithOverflowR<bits<8> op, string instr_asm,
                     InstrItinClass itin, RegisterClass RC, bit isComm = 0>:
   FA<op, (outs RC:$ra), (ins RC:$rb, RC:$rc),
-     !strconcat(instr_asm, "\t$ra, $rb, $rc"), [], itin> {
+     "/* " # instr_asm # " */\t$ra = $rb " # instr_asm # " $rc", [], itin> {
   let shamt = 0;
   let isCommutable = isComm;
 }
@@ -206,7 +206,7 @@ class ArithOverflowR<bits<8> op, string instr_asm,
 class ArithLogicI<bits<8> op, string instr_asm, SDNode OpNode,
                   Operand Od, PatLeaf imm_type, RegisterClass RC> :
   FL<op, (outs RC:$ra), (ins RC:$rb, Od:$imm16),
-     "/* " # instr_asm # " */\t$ra = $rb + $imm16",
+     "/* " # instr_asm # " */\t$ra = $rb " # instr_asm # " $imm16",
      [(set RC:$ra, (OpNode RC:$rb, imm_type:$imm16))], IIAlu> {
   let isReMaterializable = 1;
 }
@@ -457,19 +457,19 @@ defm SH     : StoreM32<0x08, "sh", truncstorei16_a>;
 
 /// Arithmetic Instructions (ALU Immediate)
 // IR "add" defined in include/llvm/Target/TargetSelectionDAG.td, line 315 (def add).
-def ADDiu   : ArithLogicI<0x09, "addiu", add, simm16, immSExt16, CPURegs>;
+def ADDiu   : ArithLogicI<0x09, "+", add, simm16, immSExt16, CPURegs>; // addiu
 def SLTi    : SetCC_I<0x0a, "slti", setlt, simm16, immSExt16, CPURegs>;
 def SLTiu   : SetCC_I<0x0b, "sltiu", setult, simm16, immSExt16, CPURegs>;
-def ANDi    : ArithLogicI<0x0c, "andi", and, uimm16, immZExt16, CPURegs>;
-def ORi     : ArithLogicI<0x0d, "ori", or, uimm16, immZExt16, CPURegs>;
-def XORi    : ArithLogicI<0x0e, "xori", xor, uimm16, immZExt16, CPURegs>;
+def ANDi    : ArithLogicI<0x0c, "&", and, uimm16, immZExt16, CPURegs>;
+def ORi     : ArithLogicI<0x0d, "|", or, uimm16, immZExt16, CPURegs>;
+def XORi    : ArithLogicI<0x0e, "^", xor, uimm16, immZExt16, CPURegs>;
 def LUi     : LoadUpper<0x0f, "lui", CPURegs, uimm16>;
 
 /// Arithmetic Instructions (3-Operand, R-Type)
-def ADDu    : ArithLogicR<0x11, "addu", add, IIAlu, CPURegs, 1>;
-def SUBu    : ArithLogicR<0x12, "subu", sub, IIAlu, CPURegs>;
-def ADD     : ArithOverflowR<0x13, "add", IIAlu, CPURegs, 1>;
-def SUB     : ArithOverflowR<0x14, "sub", IIAlu, CPURegs>;
+def ADDu    : ArithLogicR<0x11, "+", add, IIAlu, CPURegs, 1>; // addu
+def SUBu    : ArithLogicR<0x12, "-", sub, IIAlu, CPURegs>;
+def ADD     : ArithOverflowR<0x13, "+", IIAlu, CPURegs, 1>; // add
+def SUB     : ArithOverflowR<0x14, "-", IIAlu, CPURegs>;
 def MUL     : ArithLogicR<0x15, "mul", mul, IIImul, CPURegs, 1>;
 def DIV     : Div32<Cpu0DivRem, 0x16, "div", IIIdiv>;
 def DIVu    : Div32<Cpu0DivRemU, 0x17, "divu", IIIdiv>;
