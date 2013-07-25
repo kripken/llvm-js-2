@@ -27,12 +27,14 @@ Cpu0MCAsmInfo::Cpu0MCAsmInfo(const Target &T, StringRef TT) {
   Data16bitsDirective         = "\t.2byte\t";
   Data32bitsDirective         = "\t.4byte\t";
   Data64bitsDirective         = "\t.8byte\t";
+  GlobalPrefix                = "_";
   PrivateGlobalPrefix         = "$";
   CommentString               = "#";
   ZeroDirective               = "\t.space\t";
   GPRel32Directive            = "\t.gpword\t";
   GPRel64Directive            = "\t.gpdword\t";
   WeakRefDirective            = "\t.weak\t";
+  CommentString               = "//";
 
   SupportsDebugInformation = true;
   ExceptionsType = ExceptionHandling::DwarfCFI;

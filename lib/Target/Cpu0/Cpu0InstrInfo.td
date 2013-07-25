@@ -206,7 +206,7 @@ class ArithOverflowR<bits<8> op, string instr_asm,
 class ArithLogicI<bits<8> op, string instr_asm, SDNode OpNode,
                   Operand Od, PatLeaf imm_type, RegisterClass RC> :
   FL<op, (outs RC:$ra), (ins RC:$rb, Od:$imm16),
-     !strconcat(instr_asm, "\t$ra, $rb, $imm16"),
+     "/* " # instr_asm # " */\t$ra = $rb + $imm16",
      [(set RC:$ra, (OpNode RC:$rb, imm_type:$imm16))], IIAlu> {
   let isReMaterializable = 1;
 }
@@ -249,7 +249,7 @@ let canFoldAsLoad = 1 in
 class LoadM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
             Operand MemOpnd, bit Pseudo>:
   FMem<op, (outs RC:$ra), (ins MemOpnd:$addr),
-     !strconcat(instr_asm, "\t$ra, $addr"),
+     "/* " # instr_asm # " */\t$ra = HEAP32[$addr >> 2]",
      [(set RC:$ra, (OpNode addr:$addr))], IILoad> {
   let isPseudo = Pseudo;
 }
@@ -257,7 +257,7 @@ class LoadM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
 class StoreM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
              Operand MemOpnd, bit Pseudo>:
   FMem<op, (outs), (ins RC:$ra, MemOpnd:$addr),
-     !strconcat(instr_asm, "\t$ra, $addr"),
+     "/* " # instr_asm # " */\tHEAP32[$addr >> 2] = $ra",
      [(OpNode RC:$ra, addr:$addr)], IIStore> {
   let isPseudo = Pseudo;
 }
@@ -322,7 +322,7 @@ class JumpFR<bits<8> op, string instr_asm, RegisterClass RC>:
 }
 
 // Return instruction
-class RetBase<RegisterClass RC>: JumpFR<0x2C, "ret", RC> {
+class RetBase<RegisterClass RC>: JumpFR<0x2C, "return", RC> {
   let isReturn = 1;
   let isCodeGenOnly = 1;
   let hasCtrlDep = 1;
@@ -506,7 +506,7 @@ def JMP     : UncondBranch<0x26, "jmp">;
 /// Jump and Branch Instructions
 def SWI     : JumpLink<0x2A, "swi">;
 def JSUB    : JumpLink<0x2B, "jsub">;
-def JR      : JumpFR<0x2C, "ret", CPURegs>;
+def JR      : JumpFR<0x2C, "return", CPURegs>;
 
 let isReturn=1, isTerminator=1, hasDelaySlot=1, isBarrier=1, hasCtrlDep=1 in
   def RetLR : Cpu0Pseudo<(outs), (ins), "", [(Cpu0Ret)]>;
