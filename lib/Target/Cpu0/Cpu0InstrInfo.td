@@ -289,7 +289,7 @@ class CBranch<bits<8> op, string instr_asm, PatFrag cond_op, RegisterClass RC>:
 class SetCC_R<bits<8> op, string instr_asm, PatFrag cond_op,
               RegisterClass RC>:
   FA<op, (outs CPURegs:$ra), (ins RC:$rb, RC:$rc),
-     !strconcat(instr_asm, "\t$ra, $rb, $rc"),
+     "$ra = $rb " # instr_asm # " $rc",
      [(set CPURegs:$ra, (cond_op RC:$rb, RC:$rc))],
      IIAlu> {
   let shamt = 0;
@@ -298,7 +298,7 @@ class SetCC_R<bits<8> op, string instr_asm, PatFrag cond_op,
 class SetCC_I<bits<8> op, string instr_asm, PatFrag cond_op, Operand Od,
               PatLeaf imm_type, RegisterClass RC>:
   FL<op, (outs CPURegs:$ra), (ins RC:$rb, Od:$imm16),
-     !strconcat(instr_asm, "\t$ra, $rb, $imm16"),
+     "$ra = $rb " # instr_asm # " $imm16",
      [(set CPURegs:$ra, (cond_op RC:$rb, imm_type:$imm16))],
      IIAlu>;
 
@@ -464,8 +464,8 @@ defm SH     : StoreM32<0x08, "sh", truncstorei16_a>;
 /// Arithmetic Instructions (ALU Immediate)
 // IR "add" defined in include/llvm/Target/TargetSelectionDAG.td, line 315 (def add).
 def ADDiu   : ArithLogicI<0x09, "+", add, simm16, immSExt16, CPURegs>; // addiu
-def SLTi    : SetCC_I<0x0a, "slti", setlt, simm16, immSExt16, CPURegs>;
-def SLTiu   : SetCC_I<0x0b, "sltiu", setult, simm16, immSExt16, CPURegs>;
+def SLTi    : SetCC_I<0x0a, "<", setlt, simm16, immSExt16, CPURegs>; // slti
+def SLTiu   : SetCC_I<0x0b, "<", setult, simm16, immSExt16, CPURegs>; // sltiu
 def ANDi    : ArithLogicI<0x0c, "&", and, uimm16, immZExt16, CPURegs>;
 def ORi     : ArithLogicI<0x0d, "|", or, uimm16, immZExt16, CPURegs>;
 def XORi    : ArithLogicI<0x0e, "^", xor, uimm16, immZExt16, CPURegs>;
@@ -483,8 +483,8 @@ def AND     : ArithLogicR<0x18, "and", and, IIAlu, CPURegs, 1>;
 def OR      : ArithLogicR<0x19, "or", or, IIAlu, CPURegs, 1>;
 def XOR     : ArithLogicR<0x1A, "xor", xor, IIAlu, CPURegs, 1>;
 
-def SLT     : SetCC_R<0x30, "slt", setlt, CPURegs>;
-def SLTu    : SetCC_R<0x31, "sltu", setult, CPURegs>;
+def SLT     : SetCC_R<0x30, "<", setlt, CPURegs>; // slt
+def SLTu    : SetCC_R<0x31, "<", setult, CPURegs>; // sltu
 
 def MULT    : Mult32<0x50, "mult", IIImul>;
 def MULTu   : Mult32<0x51, "multu", IIImul>;
