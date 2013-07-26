@@ -183,11 +183,13 @@ def store_a         : AlignedStore<store>;
 // Instructions specific format
 //===----------------------------------------------------------------------===//
 
+let isCodeGenOnly = 1 in {
+
 // Arithmetic and logical instructions with 3 register operands.
 class ArithLogicR<bits<8> op, string instr_asm, SDNode OpNode,
                   InstrItinClass itin, RegisterClass RC, bit isComm = 0>:
   FA<op, (outs RC:$ra), (ins RC:$rb, RC:$rc),
-     "/* " # instr_asm # " */\t$ra = $rb " # instr_asm # " $rc",
+     "$ra = $rb " # instr_asm # " $rc",
      [(set RC:$ra, (OpNode RC:$rb, RC:$rc))], itin> {
   let shamt = 0;
   let isCommutable = isComm;	// e.g. add rb rc =  add rc rb
@@ -197,7 +199,7 @@ class ArithLogicR<bits<8> op, string instr_asm, SDNode OpNode,
 class ArithOverflowR<bits<8> op, string instr_asm,
                     InstrItinClass itin, RegisterClass RC, bit isComm = 0>:
   FA<op, (outs RC:$ra), (ins RC:$rb, RC:$rc),
-     "/* " # instr_asm # " */\t$ra = $rb " # instr_asm # " $rc", [], itin> {
+     "$ra = $rb " # instr_asm # " $rc", [], itin> {
   let shamt = 0;
   let isCommutable = isComm;
 }
@@ -206,7 +208,7 @@ class ArithOverflowR<bits<8> op, string instr_asm,
 class ArithLogicI<bits<8> op, string instr_asm, SDNode OpNode,
                   Operand Od, PatLeaf imm_type, RegisterClass RC> :
   FL<op, (outs RC:$ra), (ins RC:$rb, Od:$imm16),
-     "/* " # instr_asm # " */\t$ra = $rb " # instr_asm # " $imm16",
+     "$ra = $rb " # instr_asm # " $imm16",
      [(set RC:$ra, (OpNode RC:$rb, imm_type:$imm16))], IIAlu> {
   let isReMaterializable = 1;
 }
@@ -249,7 +251,7 @@ let canFoldAsLoad = 1 in
 class LoadM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
             Operand MemOpnd, bit Pseudo>:
   FMem<op, (outs RC:$ra), (ins MemOpnd:$addr),
-     "/* " # instr_asm # " */\t$ra = HEAP32[$addr >> 2]",
+     "$ra = HEAP32[$addr >> 2]",
      [(set RC:$ra, (OpNode addr:$addr))], IILoad> {
   let isPseudo = Pseudo;
 }
@@ -257,7 +259,7 @@ class LoadM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
 class StoreM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
              Operand MemOpnd, bit Pseudo>:
   FMem<op, (outs), (ins RC:$ra, MemOpnd:$addr),
-     "/* " # instr_asm # " */\tHEAP32[$addr >> 2] = $ra",
+     "HEAP32[$addr >> 2] = $ra",
      [(OpNode RC:$ra, addr:$addr)], IIStore> {
   let isPseudo = Pseudo;
 }
@@ -324,13 +326,12 @@ class JumpFR<bits<8> op, string instr_asm, RegisterClass RC>:
 // Return instruction
 class RetBase<RegisterClass RC>: JumpFR<0x2C, "return", RC> {
   let isReturn = 1;
-  let isCodeGenOnly = 1;
   let hasCtrlDep = 1;
   let hasExtraSrcRegAllocReq = 1;
 }
 
 // Jump and Link (Call)
-let isCall=1, hasDelaySlot=0, isCodeGenOnly=1 in {
+let isCall=1, hasDelaySlot=0 in {
   class JumpLinkSwi<bits<8> op, string instr_asm>:
     FJ<op, (outs), (ins calltarget:$target, variable_ops),
        !strconcat(instr_asm, "\t$target"), [(Cpu0JmpLink imm:$target)],
@@ -340,7 +341,7 @@ let isCall=1, hasDelaySlot=0, isCodeGenOnly=1 in {
 
   class JumpLink<bits<8> op, string instr_asm>:
     FJ<op, (outs), (ins calltarget:$target, variable_ops),
-       "/* " # instr_asm # " */\t${target}(${:arguments})", [(Cpu0JmpLink imm:$target)],
+       "${target}(${:arguments})", [(Cpu0JmpLink imm:$target)],
        IIBranch> {
        let DecoderMethod = "DecodeJumpAbsoluteTarget";
        }
@@ -405,6 +406,7 @@ class MoveToLOHI<bits<8> op, string instr_asm, RegisterClass RC,
 class EffectiveAddress<string instr_asm, RegisterClass RC, Operand Mem> :
   FMem<0x09, (outs RC:$ra), (ins Mem:$addr),
      instr_asm, [(set RC:$ra, addr:$addr)], IIAlu>;
+}
 
 //===----------------------------------------------------------------------===//
 // Pseudo instructions
