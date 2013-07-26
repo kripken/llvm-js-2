@@ -18,7 +18,7 @@
 # Following comments extracted from http://llvm.org/docs/LLVMBuild.html
 
 [common]
-subdirectories = AsmParser Disassembler InstPrinter MCTargetDesc TargetInfo
+subdirectories = InstPrinter MCTargetDesc TargetInfo
 
 [component_0]
 # TargetGroup components are an extension of LibraryGroups, specifically for 
@@ -31,9 +31,9 @@ name = Cpu0
 parent = Target
 # Whether this target defines an assembly parser, assembly printer, disassembler
 #  , and supports JIT compilation. They are optional.
-has_asmparser = 1
+has_asmparser = 0
 has_asmprinter = 1
-has_disassembler = 1
+has_disassembler = 0
 #has_jit = 1
 
 [component_1]

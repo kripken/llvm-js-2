@@ -183,8 +183,6 @@ def store_a         : AlignedStore<store>;
 // Instructions specific format
 //===----------------------------------------------------------------------===//
 
-let isCodeGenOnly = 1 in {
-
 // Arithmetic and logical instructions with 3 register operands.
 class ArithLogicR<bits<8> op, string instr_asm, SDNode OpNode,
                   InstrItinClass itin, RegisterClass RC, bit isComm = 0>:
@@ -406,7 +404,6 @@ class MoveToLOHI<bits<8> op, string instr_asm, RegisterClass RC,
 class EffectiveAddress<string instr_asm, RegisterClass RC, Operand Mem> :
   FMem<0x09, (outs RC:$ra), (ins Mem:$addr),
      instr_asm, [(set RC:$ra, addr:$addr)], IIAlu>;
-}
 
 //===----------------------------------------------------------------------===//
 // Pseudo instructions
