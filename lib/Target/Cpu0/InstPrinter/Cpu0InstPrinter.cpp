@@ -134,7 +134,7 @@ printMemOperandEA(const MCInst *MI, int opNum, raw_ostream &O) {
 void Cpu0InstPrinter::PrintSpecial(const MCInst *MI, raw_ostream &O,
                                    const char *Code) const {
   assert(strcmp(Code, "arguments") == 0);
-  for (int i = 0; i < MI->getNumOperands() - 1; i++) {
+  for (unsigned i = 0; i < MI->getNumOperands() - 1; i++) {
     if (i != 0) {
       O << ", ";
     }

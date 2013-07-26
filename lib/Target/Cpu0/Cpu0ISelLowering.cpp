@@ -356,7 +356,6 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   SmallVector<ISD::InputArg, 32> &Ins   = CLI.Ins;
   SDValue InChain                       = CLI.Chain;
   SDValue Callee                        = CLI.Callee;
-  bool &isTailCall                      = CLI.IsTailCall;
   CallingConv::ID CallConv              = CLI.CallConv;
   bool isVarArg                         = CLI.IsVarArg;
 
@@ -413,7 +412,7 @@ Cpu0TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
     SDValue Arg = OutVals[i];
     CCValAssign &VA = ArgLocs[i];
-    MVT ValVT = VA.getValVT(), LocVT = VA.getLocVT();
+    MVT ValVT = VA.getValVT();
     ISD::ArgFlagsTy Flags = Outs[i].Flags;
 
     // ByVal Arg.
@@ -623,7 +622,6 @@ Cpu0TargetLowering::LowerFormalArguments(SDValue Chain,
     CCValAssign &VA = ArgLocs[i];
     EVT ValVT = VA.getValVT();
     ISD::ArgFlagsTy Flags = Ins[i].Flags;
-    bool IsRegLoc = VA.isRegLoc();
 
     if (Flags.isByVal()) {
       assert(Flags.getByValSize() &&
