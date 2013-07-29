@@ -31,15 +31,6 @@ class raw_ostream;
 extern Target TheCpu0Target;
 extern Target TheCpu0elTarget;
 
-MCCodeEmitter *createCpu0MCCodeEmitterEB(const MCInstrInfo &MCII,
-                                         const MCRegisterInfo &MRI,
-                                         const MCSubtargetInfo &STI,
-                                         MCContext &Ctx);
-MCCodeEmitter *createCpu0MCCodeEmitterEL(const MCInstrInfo &MCII,
-                                         const MCRegisterInfo &MRI,
-                                         const MCSubtargetInfo &STI,
-                                         MCContext &Ctx);
-
 MCAsmBackend *createCpu0AsmBackendEB32(const Target &T, StringRef TT,
                                        StringRef CPU);
 MCAsmBackend *createCpu0AsmBackendEL32(const Target &T, StringRef TT,

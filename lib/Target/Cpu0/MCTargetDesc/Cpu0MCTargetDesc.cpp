@@ -144,12 +144,6 @@ extern "C" void LLVMInitializeCpu0TargetMC() {
   TargetRegistry::RegisterMCRegInfo(TheCpu0Target, createCpu0MCRegisterInfo);
   TargetRegistry::RegisterMCRegInfo(TheCpu0elTarget, createCpu0MCRegisterInfo);
 
-  // Register the MC Code Emitter
-  TargetRegistry::RegisterMCCodeEmitter(TheCpu0Target,
-                                        createCpu0MCCodeEmitterEB);
-  TargetRegistry::RegisterMCCodeEmitter(TheCpu0elTarget,
-                                        createCpu0MCCodeEmitterEL);
-
   // Register the object streamer.
   TargetRegistry::RegisterMCObjectStreamer(TheCpu0Target, createMCStreamer);
   TargetRegistry::RegisterMCObjectStreamer(TheCpu0elTarget, createMCStreamer);
