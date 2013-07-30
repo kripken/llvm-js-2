@@ -129,19 +129,8 @@ bool Cpu0InstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
   switch(MI->getDesc().getOpcode()) {
   default:
     return false;
-  case Cpu0::RetLR:
-    ExpandRetLR(MBB, MI, Cpu0::RET);
-    break;
   }
 
   MBB.erase(MI);
   return true;
 }
-
-void Cpu0InstrInfo::ExpandRetLR(MachineBasicBlock &MBB,
-                                MachineBasicBlock::iterator I,
-                                unsigned Opc) const {
-  BuildMI(MBB, I, I->getDebugLoc(), get(Opc)).addReg(Cpu0::LR);
-}
-
-

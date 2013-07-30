@@ -321,13 +321,6 @@ class JumpFR<bits<8> op, string instr_asm, RegisterClass RC>:
   let imm16 = 0;
 }
 
-// Return instruction
-class RetBase<RegisterClass RC>: JumpFR<0x2C, "return", RC> {
-  let isReturn = 1;
-  let hasCtrlDep = 1;
-  let hasExtraSrcRegAllocReq = 1;
-}
-
 // Jump and Link (Call)
 let isCall=1, hasDelaySlot=0 in {
   class JumpLinkSwi<bits<8> op, string instr_asm>:
@@ -512,12 +505,9 @@ def JMP     : UncondBranch<0x26, "jmp">;
 /// Jump and Branch Instructions
 def SWI     : JumpLinkSwi<0x2A, "swi">;
 def JSUB    : JumpLink<0x2B, "jsub">;
-def JR      : JumpFR<0x2C, "return", CPURegs>;
 
-let isReturn=1, isTerminator=1, hasDelaySlot=1, isBarrier=1, hasCtrlDep=1 in
-  def RetLR : Cpu0Pseudo<(outs), (ins), "", [(Cpu0Ret)]>;
-
-def RET     : RetBase<CPURegs>;
+let isReturn=1, isTerminator=1, isBarrier=1, hasCtrlDep=1 in
+    def RET     : FL<0xFF, (outs), (ins), "return", [(Cpu0Ret)], IIBranch>;
 
 def IRET    : JumpFR<0x2D, "iret", CPURegs>;
 def JALR    : JumpLinkReg<0x2E, "jalr", CPURegs>;

@@ -60,10 +60,6 @@ public:
                                                  DebugLoc DL) const;
   /// Expand Pseudo instructions into real backend instructions
   virtual bool expandPostRAPseudo(MachineBasicBlock::iterator MI) const;
-
-private:
-  void ExpandRetLR(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
-                   unsigned Opc) const;
 };
 }
 
