@@ -45,7 +45,7 @@ def Cpu0Lo    : SDNode<"Cpu0ISD::Lo", SDTIntUnaryOp>;
 def Cpu0GPRel : SDNode<"Cpu0ISD::GPRel", SDTIntUnaryOp>;
 
 // Return
-def Cpu0Ret : SDNode<"Cpu0ISD::Ret", SDTNone,
+def Cpu0Ret : SDNode<"Cpu0ISD::Ret", SDT_Cpu0Ret,
                      [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
 // These are target-independent nodes, but have target-specific formats.
@@ -507,7 +507,8 @@ def SWI     : JumpLinkSwi<0x2A, "swi">;
 def JSUB    : JumpLink<0x2B, "jsub">;
 
 let isReturn=1, isTerminator=1, isBarrier=1, hasCtrlDep=1 in
-    def RET     : FL<0xFF, (outs), (ins), "return", [(Cpu0Ret)], IIBranch>;
+    def RET     : FL<0xFF, (outs), (ins CPURegs:$ra), "return $ra", [(Cpu0Ret
+CPURegs:$ra)], IIBranch>;
 
 def IRET    : JumpFR<0x2D, "iret", CPURegs>;
 def JALR    : JumpLinkReg<0x2E, "jalr", CPURegs>;

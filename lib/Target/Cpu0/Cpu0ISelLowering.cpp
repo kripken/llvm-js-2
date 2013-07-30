@@ -758,7 +758,6 @@ Cpu0TargetLowering::LowerReturn(SDValue Chain,
   if (Flag.getNode())
     RetOps.push_back(Flag);
 
-  // Return on Cpu0 is always a "ret $lr"
   return DAG.getNode(Cpu0ISD::Ret, dl, MVT::Other, &RetOps[0], RetOps.size());
 }
 
