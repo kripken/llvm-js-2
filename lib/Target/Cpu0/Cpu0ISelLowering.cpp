@@ -256,38 +256,10 @@ SDValue Cpu0TargetLowering::LowerGlobalAddress(SDValue Op,
   // FIXME there isn't actually debug info here
   DebugLoc dl = Op.getDebugLoc();
   const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
-
-  Cpu0TargetObjectFile &TLOF = (Cpu0TargetObjectFile&)getObjFileLowering();
-
-  if (getTargetMachine().getRelocationModel() != Reloc::PIC_) {
-    SDVTList VTs = DAG.getVTList(MVT::i32);
-
-    // %gp_rel relocation
-    if (TLOF.IsGlobalInSmallSection(GV, getTargetMachine())) {
-      SDValue GA = DAG.getTargetGlobalAddress(GV, dl, MVT::i32, 0,
-                                              Cpu0II::MO_GPREL);
-      SDValue GPRelNode = DAG.getNode(Cpu0ISD::GPRel, dl, VTs, &GA, 1);
-      SDValue GOT = DAG.getGLOBAL_OFFSET_TABLE(MVT::i32);
-      return DAG.getNode(ISD::ADD, dl, MVT::i32, GOT, GPRelNode);
-    }
-    // %hi/%lo relocation
-    SDValue GAHi = DAG.getTargetGlobalAddress(GV, dl, MVT::i32, 0,
-                                              Cpu0II::MO_ABS_HI);
-    SDValue GALo = DAG.getTargetGlobalAddress(GV, dl, MVT::i32, 0,
-                                              Cpu0II::MO_ABS_LO);
-    SDValue HiPart = DAG.getNode(Cpu0ISD::Hi, dl, VTs, &GAHi, 1);
-    SDValue Lo = DAG.getNode(Cpu0ISD::Lo, dl, MVT::i32, GALo);
-    return DAG.getNode(ISD::ADD, dl, MVT::i32, HiPart, Lo);
-  }
-
-  if (GV->hasInternalLinkage() || (GV->hasLocalLinkage() && !isa<Function>(GV)))
-    return getAddrLocal(Op, DAG);
-
-  if (TLOF.IsGlobalInSmallSection(GV, getTargetMachine()))
-    return getAddrGlobal(Op, DAG, Cpu0II::MO_GOT16);
-  else
-    return getAddrGlobalLargeGOT(Op, DAG, Cpu0II::MO_GOT_HI16,
-                                 Cpu0II::MO_GOT_LO16);
+  SDValue GALo = DAG.getTargetGlobalAddress(GV, dl, MVT::i32, 0,
+                                            Cpu0II::MO_ABS_LO);
+  SDValue Lo = DAG.getNode(Cpu0ISD::Lo, dl, MVT::i32, GALo);
+  return Lo;
 }
 
 SDValue Cpu0TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
