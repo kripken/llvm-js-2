@@ -303,6 +303,32 @@ void Cpu0AsmPrinter::EmitStartOfAsmFile(Module &M) {
     OutStreamer.EmitRawText(StringRef("\t.previous"));
 }
 
+void Cpu0AsmPrinter::EmitEndOfAsmFile(Module &M) {
+  OutStreamer.EmitRawText(StringRef("allocate(["));
+  for (std::vector<char>::iterator I = GlobalHeap.begin();
+      I != GlobalHeap.end(); ++I) {
+    if (I != GlobalHeap.begin()) {
+      OutStreamer.EmitRawText(StringRef(","));
+    }
+    OutStreamer.EmitRawText(StringRef(itostr(*I));
+  }
+  OutStreamer.EmitRawText(StringRef("])"));
+}
+
+void Cpu0AsmPrinter::EmitGlobalVariable(const GlobalVariable *GV) {
+  const Constant *CV = GV->getInitializer();
+  if (const ConstantDataSequential *CDS = dyn_cast<ConstantDataSequential>(CV)) {
+    if (CDS->isString()) {
+      StringRef S = CDS->getAsString();
+      for (const char* C = S.begin(); C != S.end(); ++C) {
+        GlobalHeap.push_back(*C);
+      }
+      return;
+    }
+  }
+  assert(false);
+}
+
 MachineLocation
 Cpu0AsmPrinter::getDebugValueLocation(const MachineInstr *MI) const {
   // Handles frame addresses emitted in Cpu0InstrInfo::emitFrameIndexDebugValue.

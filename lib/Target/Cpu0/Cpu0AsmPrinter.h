@@ -37,9 +37,11 @@ public:
   const Cpu0Subtarget *Subtarget;
   const Cpu0FunctionInfo *Cpu0FI;
   Cpu0MCInstLower MCInstLowering;
+  std::vector<char> GlobalHeap;
 
   explicit Cpu0AsmPrinter(TargetMachine &TM,  MCStreamer &Streamer)
     : AsmPrinter(TM, Streamer), MCInstLowering(*this) {
+    GlobalHeap.push_back(255);
     Subtarget = &TM.getSubtarget<Cpu0Subtarget>();
   }
 
@@ -58,11 +60,12 @@ public:
   virtual void EmitFunctionEntryLabel();
   virtual void EmitFunctionBodyStart();
   virtual void EmitFunctionBodyEnd();
-  void EmitStartOfAsmFile(Module &M);
+  virtual void EmitStartOfAsmFile(Module &M);
+  virtual void EmitEndOfAsmFile(Module &M);
+  virtual void EmitGlobalVariable(const GlobalVariable *GV);
   virtual MachineLocation getDebugValueLocation(const MachineInstr *MI) const;
   void PrintDebugValueComment(const MachineInstr *MI, raw_ostream &OS);
 };
 }
 
 #endif
-
