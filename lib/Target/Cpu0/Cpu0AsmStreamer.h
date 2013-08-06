@@ -61,7 +61,9 @@ public:
   }
   ~Cpu0AsmStreamer() {}
 
-  inline void EmitEOL() {}
+  formatted_raw_ostream& getOStream() { return OS; }
+
+  inline void EmitEOL() { OS << "\n"; }
 
   /// isVerboseAsm - Return true if this streamer supports verbose assembly at
   /// all.

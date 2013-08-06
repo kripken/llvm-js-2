@@ -20,6 +20,7 @@
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Target/TargetMachine.h"
+#include "Cpu0AsmStreamer.h"
 
 namespace llvm {
 class MCStreamer;
@@ -31,6 +32,7 @@ class raw_ostream;
 class LLVM_LIBRARY_VISIBILITY Cpu0AsmPrinter : public AsmPrinter {
 
   void EmitInstrWithMacroNoAT(const MachineInstr *MI);
+  formatted_raw_ostream &OS;
 
 public:
 
@@ -40,7 +42,8 @@ public:
   std::vector<char> GlobalHeap;
 
   explicit Cpu0AsmPrinter(TargetMachine &TM,  MCStreamer &Streamer)
-    : AsmPrinter(TM, Streamer), MCInstLowering(*this) {
+    : AsmPrinter(TM, Streamer), OS(dyn_cast<Cpu0AsmStreamer>(&Streamer)->getOStream()),
+      MCInstLowering(*this) {
     GlobalHeap.push_back(255);
     Subtarget = &TM.getSubtarget<Cpu0Subtarget>();
   }

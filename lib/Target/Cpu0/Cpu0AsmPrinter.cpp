@@ -224,9 +224,7 @@ void Cpu0AsmPrinter::EmitFunctionEntryLabel() {
     First = false;
     ArgString += "a";
   }
-  OutStreamer.EmitRawText("function " + Twine(CurrentFnSym->getName()) + "(" +
-          ArgString + ") {");
-  //OutStreamer.EmitRawText("\t.ent\t" + Twine(CurrentFnSym->getName()));
+  OS << "function " + Twine(CurrentFnSym->getName()) + "(" + ArgString + ") {\n";
 }
 
 
@@ -285,7 +283,7 @@ void Cpu0AsmPrinter::EmitFunctionBodyEnd() {
     OutStreamer.EmitRawText("\t.end\t" + Twine(CurrentFnSym->getName()));
   }
 #endif
-  OutStreamer.EmitRawText(StringRef("}"));
+  OS << "}\n";
 }
 
 //	.section .mdebug.abi32
@@ -304,15 +302,15 @@ void Cpu0AsmPrinter::EmitStartOfAsmFile(Module &M) {
 }
 
 void Cpu0AsmPrinter::EmitEndOfAsmFile(Module &M) {
-  OutStreamer.EmitRawText(StringRef("allocate(["));
+  OS << "allocate([";
   for (std::vector<char>::iterator I = GlobalHeap.begin();
       I != GlobalHeap.end(); ++I) {
     if (I != GlobalHeap.begin()) {
-      OutStreamer.EmitRawText(StringRef(","));
+      OS << ",";
     }
-    OutStreamer.EmitRawText(StringRef(itostr(*I)));
+    OS << itostr(*I);
   }
-  OutStreamer.EmitRawText(StringRef("])"));
+  OS << "])";
 }
 
 void Cpu0AsmPrinter::EmitGlobalVariable(const GlobalVariable *GV) {
