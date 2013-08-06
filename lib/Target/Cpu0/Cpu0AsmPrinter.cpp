@@ -310,7 +310,7 @@ void Cpu0AsmPrinter::EmitEndOfAsmFile(Module &M) {
     if (I != GlobalHeap.begin()) {
       OutStreamer.EmitRawText(StringRef(","));
     }
-    OutStreamer.EmitRawText(StringRef(itostr(*I));
+    OutStreamer.EmitRawText(StringRef(itostr(*I)));
   }
   OutStreamer.EmitRawText(StringRef("])"));
 }

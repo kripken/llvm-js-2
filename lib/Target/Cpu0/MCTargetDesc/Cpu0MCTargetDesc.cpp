@@ -22,6 +22,7 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TargetRegistry.h"
+#include "Cpu0AsmStreamer.h"
 
 #define GET_INSTRINFO_MC_DESC
 #include "Cpu0GenInstrInfo.inc"
@@ -115,6 +116,18 @@ static MCInstPrinter *createCpu0MCInstPrinter(const Target &T,
   return new Cpu0InstPrinter(MAI, MII, MRI);
 }
 
+static  MCStreamer *createCpu0AsmStreamer(MCContext &Ctx, formatted_raw_ostream &OS,
+                                bool isVerboseAsm,
+                                bool useLoc, bool useCFI,
+                                bool useDwarfDirectory,
+                                MCInstPrinter *InstPrint,
+                                MCCodeEmitter *CE,
+                                MCAsmBackend *TAB,
+                                bool ShowInst) {
+  return new Cpu0AsmStreamer(Ctx, OS, isVerboseAsm, useLoc, useCFI, useDwarfDirectory,
+      InstPrint, CE, TAB, ShowInst);
+}
+
 static MCStreamer *createMCStreamer(const Target &T, StringRef TT,
                                     MCContext &Ctx, MCAsmBackend &MAB,
                                     raw_ostream &_OS,
@@ -143,6 +156,8 @@ extern "C" void LLVMInitializeCpu0TargetMC() {
   // Register the MC register info.
   TargetRegistry::RegisterMCRegInfo(TheCpu0Target, createCpu0MCRegisterInfo);
   TargetRegistry::RegisterMCRegInfo(TheCpu0elTarget, createCpu0MCRegisterInfo);
+
+  TargetRegistry::RegisterAsmStreamer(TheCpu0Target, createCpu0AsmStreamer);
 
   // Register the object streamer.
   TargetRegistry::RegisterMCObjectStreamer(TheCpu0Target, createMCStreamer);
