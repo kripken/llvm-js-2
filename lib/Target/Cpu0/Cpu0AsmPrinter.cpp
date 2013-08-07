@@ -237,6 +237,21 @@ void Cpu0AsmPrinter::EmitFunctionEntryLabel() {
 void Cpu0AsmPrinter::EmitFunctionBodyStart() {
   MCInstLowering.Initialize(Mang, &MF->getContext());
 
+  for (MachineFunction::const_iterator I = MF->begin(), E = MF->end();
+       I != E; ++I) {
+    for (MachineBasicBlock::const_iterator II = I->begin(), IE = I->end();
+         II != IE; ++II) {
+      for (unsigned i = 0, e = II->getNumOperands(); i != e; ++i) {
+        const MachineOperand &MO = II->getOperand(i);
+
+        if (MO.isReg() && MO.isDef() &&
+            TargetRegisterInfo::isPhysicalRegister(MO.getReg())) {
+          OS << "\tvar $" << Cpu0InstPrinter::getRegisterName(MO.getReg()) << ";\n";
+        }
+      }
+    }
+  }
+
 #if 0
   emitFrameDirective();
   bool EmitCPLoad = (MF->getTarget().getRelocationModel() == Reloc::PIC_) &&
