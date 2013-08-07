@@ -21,6 +21,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/SparseSet.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -237,6 +238,10 @@ void Cpu0AsmPrinter::EmitFunctionEntryLabel() {
 void Cpu0AsmPrinter::EmitFunctionBodyStart() {
   MCInstLowering.Initialize(Mang, &MF->getContext());
 
+  const TargetRegisterInfo &RI = *TM.getRegisterInfo();
+  SparseSet<unsigned> SeenDefs;
+  SeenDefs.setUniverse(RI.getNumRegs());
+
   for (MachineFunction::const_iterator I = MF->begin(), E = MF->end();
        I != E; ++I) {
     for (MachineBasicBlock::const_iterator II = I->begin(), IE = I->end();
@@ -245,7 +250,8 @@ void Cpu0AsmPrinter::EmitFunctionBodyStart() {
         const MachineOperand &MO = II->getOperand(i);
 
         if (MO.isReg() && MO.isDef() &&
-            TargetRegisterInfo::isPhysicalRegister(MO.getReg())) {
+            TargetRegisterInfo::isPhysicalRegister(MO.getReg()) &&
+            SeenDefs.insert(MO.getReg()).second) {
           OS << "\tvar $" << Cpu0InstPrinter::getRegisterName(MO.getReg()) << ";\n";
         }
       }
