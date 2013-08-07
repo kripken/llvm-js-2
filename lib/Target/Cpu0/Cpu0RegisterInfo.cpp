@@ -56,13 +56,8 @@ Cpu0RegisterInfo::Cpu0RegisterInfo(const Cpu0Subtarget &ST,
 const uint16_t* Cpu0RegisterInfo::
 getCalleeSavedRegs(const MachineFunction *MF) const
 {
-  return CSR_O32_SaveList;
-}
-
-const uint32_t*
-Cpu0RegisterInfo::getCallPreservedMask(CallingConv::ID) const
-{
-  return CSR_O32_RegMask; 
+  static const uint16_t CalleeSavedRegs[] = { 0 };
+  return CalleeSavedRegs;
 }
 
 // pure virtual method

@@ -37,7 +37,6 @@ struct Cpu0RegisterInfo : public Cpu0GenRegisterInfo {
 
   /// Code Generation virtual methods...
   const uint16_t *getCalleeSavedRegs(const MachineFunction* MF = 0) const;
-  const uint32_t *getCallPreservedMask(CallingConv::ID) const;
 
 // pure virtual method
   BitVector getReservedRegs(const MachineFunction &MF) const;
