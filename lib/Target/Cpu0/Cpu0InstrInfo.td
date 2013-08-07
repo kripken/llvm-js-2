@@ -236,19 +236,11 @@ class LoadUpper<bits<8> op, string instr_asm, RegisterClass RC, Operand Imm>:
   let isReMaterializable = 1;
 }
 
-class FMem<bits<8> op, dag outs, dag ins, string asmstr, list<dag> pattern,
-          InstrItinClass itin>: FL<op, outs, ins, asmstr, pattern, itin> {
-  bits<20> addr;
-  let Inst{19-16} = addr{19-16};
-  let Inst{15-0}  = addr{15-0};
-  let DecoderMethod = "DecodeMem";
-}
-
 // Memory Load/Store
 let canFoldAsLoad = 1 in
 class LoadM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
             Operand MemOpnd, bit Pseudo>:
-  FMem<op, (outs RC:$ra), (ins MemOpnd:$addr),
+  FL<op, (outs RC:$ra), (ins MemOpnd:$addr),
      "$ra = HEAP32[${addr}>>2]",
      [(set RC:$ra, (OpNode addr:$addr))], IILoad> {
   let isPseudo = Pseudo;
@@ -256,7 +248,7 @@ class LoadM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
 
 class StoreM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
              Operand MemOpnd, bit Pseudo>:
-  FMem<op, (outs), (ins RC:$ra, MemOpnd:$addr),
+  FL<op, (outs), (ins RC:$ra, MemOpnd:$addr),
      "HEAP32[${addr}>>2] = $ra",
      [(OpNode RC:$ra, addr:$addr)], IIStore> {
   let isPseudo = Pseudo;
@@ -395,7 +387,7 @@ class MoveToLOHI<bits<8> op, string instr_asm, RegisterClass RC,
 }
 
 class EffectiveAddress<string instr_asm, RegisterClass RC, Operand Mem> :
-  FMem<0x09, (outs RC:$ra), (ins Mem:$addr),
+  FL<0x09, (outs RC:$ra), (ins Mem:$addr),
      instr_asm, [(set RC:$ra, addr:$addr)], IIAlu>;
 
 //===----------------------------------------------------------------------===//
