@@ -138,6 +138,6 @@ void Cpu0InstPrinter::PrintSpecial(const MCInst *MI, raw_ostream &O,
     if (i != 0) {
       O << ", ";
     }
-    O << "$r" << i;
+    O << "$r" << i << "|0";
   }
 }

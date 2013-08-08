@@ -45,14 +45,6 @@ Cpu0RegisterInfo::Cpu0RegisterInfo(const Cpu0Subtarget &ST,
                                    const TargetInstrInfo &tii)
   : Cpu0GenRegisterInfo(Cpu0::LR), Subtarget(ST), TII(tii) {}
 
-//===----------------------------------------------------------------------===//
-// Callee Saved Registers methods
-//===----------------------------------------------------------------------===//
-/// Cpu0 Callee Saved Registers
-// In Cpu0CallConv.td,
-// def CSR_O32 : CalleeSavedRegs<(add LR, FP,
-//                                   (sequence "S%u", 2, 0))>;
-// llc create CSR_O32_SaveList and CSR_O32_RegMask from above defined.
 const uint16_t* Cpu0RegisterInfo::
 getCalleeSavedRegs(const MachineFunction *MF) const
 {

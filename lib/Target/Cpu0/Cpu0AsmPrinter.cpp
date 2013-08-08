@@ -308,22 +308,39 @@ void Cpu0AsmPrinter::EmitFunctionBodyEnd() {
   OS << "}\n";
 }
 
-//	.section .mdebug.abi32
-//	.previous
 void Cpu0AsmPrinter::EmitStartOfAsmFile(Module &M) {
-  // FIXME: Use SwitchSection.
-
-  // Tell the assembler which ABI we are using
-  if (OutStreamer.hasRawTextSupport())
-    OutStreamer.EmitRawText("\t.section .mdebug." +
-                            Twine(getCurrentABIString()));
-
-  // return to previous section
-  if (OutStreamer.hasRawTextSupport())
-    OutStreamer.EmitRawText(StringRef("\t.previous"));
+  // TODO replace this with a proper printf from existing emscripten library
+  //      code
+  OS << "function _printf(format, varargs) {\n"
+        "\tvar view = new Int8Array(buffer);\n"
+        "\tprint(view[format>>2], varargs);\n"
+        "}\n"
+        "var Math_min = Math.min;\n"
+        "var buffer = new ArrayBuffer(4096);\n";
+  OS << "var asm = (function(global, env, buffer) {\n"
+        "\t'use asm';\n"
+        "\tvar _printf = env._printf;\n"
+        "\tvar HEAP8 = new global.Int8Array(buffer);\n"
+        "\tvar HEAP16 = new global.Int16Array(buffer);\n"
+        "\tvar HEAP32 = new global.Int32Array(buffer);\n"
+        "\tvar HEAPU8 = new global.Uint8Array(buffer);\n"
+        "\tvar HEAPU16 = new global.Uint16Array(buffer);\n"
+        "\tvar HEAPU32 = new global.Uint32Array(buffer);\n"
+        "\tvar HEAPF32 = new global.Float32Array(buffer);\n"
+        "\tvar HEAPF64 = new global.Float64Array(buffer);\n";
 }
 
 void Cpu0AsmPrinter::EmitEndOfAsmFile(Module &M) {
+  OS << "return { _main: _main };\n"
+        "})\n"
+        "({ 'Math': Math, 'Int8Array': Int8Array, 'Int16Array': Int16Array, 'Int32Array': Int32Array, 'Uint8Array': Uint8Array, 'Uint16Array': Uint16Array, 'Uint32Array': Uint32Array, 'Float32Array': Float32Array, 'Float64Array': Float64Array }, { 'min': Math_min, '_printf': _printf, 'NaN': NaN, 'Infinity': Infinity }, buffer);\n";
+  OS <<
+"var ALLOC_NONE = 0;\n"
+"var Runtime = { GLOBAL_BASE: 0 };\n"
+"function allocate(a, x, y, offset) {\n"
+"  var view = new Int8Array(buffer);\n"
+"  view.set(a, offset);\n"
+"}\n";
   OS << "allocate([";
   for (std::vector<char>::iterator I = GlobalHeap.begin();
       I != GlobalHeap.end(); ++I) {
@@ -332,7 +349,8 @@ void Cpu0AsmPrinter::EmitEndOfAsmFile(Module &M) {
     }
     OS << itostr(*I);
   }
-  OS << "])";
+  OS << "], 'i8', ALLOC_NONE, Runtime.GLOBAL_BASE);\n";
+  OS << "asm._main();";
 }
 
 void Cpu0AsmPrinter::EmitGlobalVariable(const GlobalVariable *GV) {

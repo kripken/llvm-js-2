@@ -187,7 +187,7 @@ def store_a         : AlignedStore<store>;
 class ArithLogicR<bits<8> op, string instr_asm, SDNode OpNode,
                   InstrItinClass itin, RegisterClass RC, bit isComm = 0>:
   FA<op, (outs RC:$ra), (ins RC:$rb, RC:$rc),
-     "$ra = $rb " # instr_asm # " $rc",
+     "$ra = ($rb " # instr_asm # " $rc)|0",
      [(set RC:$ra, (OpNode RC:$rb, RC:$rc))], itin> {
   let shamt = 0;
   let isCommutable = isComm;	// e.g. add rb rc =  add rc rb
@@ -206,7 +206,7 @@ class ArithOverflowR<bits<8> op, string instr_asm,
 class ArithLogicI<bits<8> op, string instr_asm, SDNode OpNode,
                   Operand Od, PatLeaf imm_type, RegisterClass RC> :
   FL<op, (outs RC:$ra), (ins RC:$rb, Od:$imm16),
-     "$ra = $rb " # instr_asm # " $imm16",
+     "$ra = ($rb " # instr_asm # " $imm16)|0",
      [(set RC:$ra, (OpNode RC:$rb, imm_type:$imm16))], IIAlu> {
   let isReMaterializable = 1;
 }
@@ -241,7 +241,7 @@ let canFoldAsLoad = 1 in
 class LoadM<bits<8> op, string instr_asm, PatFrag OpNode, RegisterClass RC,
             Operand MemOpnd, bit Pseudo>:
   FL<op, (outs RC:$ra), (ins MemOpnd:$addr),
-     "$ra = HEAP32[${addr}>>2]",
+     "$ra = HEAP32[${addr}>>2]|0",
      [(set RC:$ra, (OpNode addr:$addr))], IILoad> {
   let isPseudo = Pseudo;
 }
@@ -498,9 +498,16 @@ def JMP     : UncondBranch<0x26, "jmp">;
 def SWI     : JumpLinkSwi<0x2A, "swi">;
 def JSUB    : JumpLink<0x2B, "jsub">;
 
-let isReturn=1, isTerminator=1, isBarrier=1, hasCtrlDep=1 in
-    def RET     : FL<0xFF, (outs), (ins CPURegs:$ra), "return $ra", [(Cpu0Ret
+let isReturn=1, isTerminator=1, isBarrier=1, hasCtrlDep=1 in {
+    /*def RET     : FL<0xFF, (outs), (ins CPURegs:$ra), "return", [(Cpu0Ret*/
+/*CPURegs:$ra)], IIBranch>;*/
+    def RETi    : FL<0xFF, (outs), (ins CPURegs:$ra), "return $ra|0", [(Cpu0Ret
 CPURegs:$ra)], IIBranch>;
+    /*def RETd    : FL<0xFF, (outs), (ins CPURegs:$ra), "return +$ra", [(Cpu0Ret*/
+/*CPURegs:$ra)], IIBranch>;*/
+    /*def RETimm  : FL<0xFF, (outs), (ins simm16:$imm), "return $imm", [(Cpu0Ret*/
+/*CPURegs:$ra)], IIBranch>;*/
+}
 
 def IRET    : JumpFR<0x2D, "iret", CPURegs>;
 def JALR    : JumpLinkReg<0x2E, "jalr", CPURegs>;
@@ -523,9 +530,9 @@ def LEA_ADDiu : EffectiveAddress<"addiu\t$ra, $addr", CPURegs, mem_ea> {
 
 // Small immediates
 def : Pat<(i32 immSExt16:$in),
-          (ADDiu ZERO, imm:$in)>;
+          (ADDiu 0, imm:$in)>;
 def : Pat<(i32 immZExt16:$in),
-          (ORi ZERO, imm:$in)>;
+          (ORi 0, imm:$in)>;
 def : Pat<(i32 immLow16Zero:$in),
           (LUi (HI16 imm:$in))>;
 
@@ -538,7 +545,7 @@ def : Pat<(Cpu0JmpLink (i32 tglobaladdr:$dst)),
 
 // hi/lo relocs
 def : Pat<(Cpu0Hi tglobaladdr:$in), (LUi tglobaladdr:$in)>;
-def : Pat<(Cpu0Lo tglobaladdr:$in), (ADDiu ZERO, tglobaladdr:$in)>;
+def : Pat<(Cpu0Lo tglobaladdr:$in), (ADDiu 0, tglobaladdr:$in)>;
 
 def : Pat<(add CPURegs:$hi, (Cpu0Lo tglobaladdr:$lo)),
           (ADDiu CPURegs:$hi, tglobaladdr:$lo)>;
