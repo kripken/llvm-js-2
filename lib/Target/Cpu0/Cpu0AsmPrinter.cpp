@@ -252,7 +252,8 @@ void Cpu0AsmPrinter::EmitFunctionBodyStart() {
         if (MO.isReg() && MO.isDef() &&
             TargetRegisterInfo::isPhysicalRegister(MO.getReg()) &&
             SeenDefs.insert(MO.getReg()).second) {
-          OS << "\tvar $" << Cpu0InstPrinter::getRegisterName(MO.getReg()) << ";\n";
+          // TODO: initialize differently depending on Int/FP register class.
+          OS << "\tvar $" << Cpu0InstPrinter::getRegisterName(MO.getReg()) << " = 0;\n";
         }
       }
     }
