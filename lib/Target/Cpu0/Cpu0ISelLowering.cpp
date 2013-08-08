@@ -257,11 +257,7 @@ SDValue Cpu0TargetLowering::LowerGlobalAddress(SDValue Op,
   // FIXME there isn't actually debug info here
   DebugLoc dl = Op.getDebugLoc();
   //const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
-  EVT Ty = Op.getValueType();
-  SDValue GOT = DAG.getConstant(1, MVT::i32); // XXX this should be the pointer offset
-  return DAG.getLoad(Ty, dl, DAG.getEntryNode(), GOT,
-                     MachinePointerInfo::getGOT(), false, false, false,
-                     0);
+  return DAG.getConstant(1, MVT::i32); // XXX this should be the pointer offset
 }
 
 SDValue Cpu0TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
