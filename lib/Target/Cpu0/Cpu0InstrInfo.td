@@ -21,7 +21,8 @@ include "Cpu0InstrFormats.td"
 // Cpu0 profiles and nodes
 //===----------------------------------------------------------------------===//
 
-def SDT_Cpu0Ret          : SDTypeProfile<0, 1, [SDTCisInt<0>]>;
+def SDT_Cpu0Ret          : SDTypeProfile<0, 0, []>;
+def SDT_Cpu0RetValue     : SDTypeProfile<0, 1, []>;
 
 def SDT_Cpu0DivRem       : SDTypeProfile<0, 2,
                                          [SDTCisInt<0>,
@@ -46,6 +47,8 @@ def Cpu0GPRel : SDNode<"Cpu0ISD::GPRel", SDTIntUnaryOp>;
 
 // Return
 def Cpu0Ret : SDNode<"Cpu0ISD::Ret", SDT_Cpu0Ret,
+                     [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+def Cpu0RetValue : SDNode<"Cpu0ISD::RetValue", SDT_Cpu0RetValue,
                      [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
 // These are target-independent nodes, but have target-specific formats.
@@ -499,10 +502,9 @@ def SWI     : JumpLinkSwi<0x2A, "swi">;
 def JSUB    : JumpLink<0x2B, "jsub">;
 
 let isReturn=1, isTerminator=1, isBarrier=1, hasCtrlDep=1 in {
-    /*def RET     : FL<0xFF, (outs), (ins CPURegs:$ra), "return", [(Cpu0Ret*/
-/*CPURegs:$ra)], IIBranch>;*/
-    def RETi    : FL<0xFF, (outs), (ins CPURegs:$ra), "return $ra|0", [(Cpu0Ret
-CPURegs:$ra)], IIBranch>;
+    def RET     : FL<0xFF, (outs), (ins), "return", [(Cpu0Ret)], IIBranch>;
+    def RETi    : FL<0xFF, (outs), (ins CPURegs:$ra), "return $ra|0",
+                     [(Cpu0RetValue CPURegs:$ra)], IIBranch>;
     /*def RETd    : FL<0xFF, (outs), (ins CPURegs:$ra), "return +$ra", [(Cpu0Ret*/
 /*CPURegs:$ra)], IIBranch>;*/
     /*def RETimm  : FL<0xFF, (outs), (ins simm16:$imm), "return $imm", [(Cpu0Ret*/

@@ -107,6 +107,7 @@ const char *Cpu0TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case Cpu0ISD::Lo:                return "Cpu0ISD::Lo";
   case Cpu0ISD::GPRel:             return "Cpu0ISD::GPRel";
   case Cpu0ISD::Ret:               return "Cpu0ISD::Ret";
+  case Cpu0ISD::RetValue:          return "Cpu0ISD::RetValue";
   case Cpu0ISD::DivRem:            return "Cpu0ISD::DivRem";
   case Cpu0ISD::DivRemU:           return "Cpu0ISD::DivRemU";
   case Cpu0ISD::Wrapper:           return "Cpu0ISD::Wrapper";
@@ -687,37 +688,23 @@ Cpu0TargetLowering::LowerReturn(SDValue Chain,
   SDValue Flag;
   SmallVector<SDValue, 4> RetOps(1, Chain);
 
+  assert(RVLocs.size() <= 1 && "Too many values to return!");
+
   // Copy the result values into the output registers.
-  for (unsigned i = 0; i != RVLocs.size(); ++i) {
-    CCValAssign &VA = RVLocs[i];
+  if (RVLocs.size() > 0) {
+    CCValAssign &VA = RVLocs[0];
     assert(VA.isRegLoc() && "Can only return in registers!");
 
-    Chain = DAG.getCopyToReg(Chain, dl, VA.getLocReg(), OutVals[i], Flag);
+    Chain = DAG.getCopyToReg(Chain, dl, VA.getLocReg(), OutVals[0], Flag);
 
     // Guarantee that all emitted copies are stuck together with flags.
     Flag = Chain.getValue(1);
     RetOps.push_back(DAG.getRegister(VA.getLocReg(), VA.getLocVT()));
   }
 
-#if 1	// Without this, it will use $3 instead of $2 as return register.
-  // The cpu0 ABIs for returning structs by value requires that we copy
-  // the sret argument into $v0 for the return. We saved the argument into
-  // a virtual register in the entry block, so now we copy the value out
-  // and into $v0.
   if (DAG.getMachineFunction().getFunction()->hasStructRetAttr()) {
-    MachineFunction &MF      = DAG.getMachineFunction();
-    Cpu0FunctionInfo *Cpu0FI = MF.getInfo<Cpu0FunctionInfo>();
-    unsigned Reg = Cpu0FI->getSRetReturnReg();
-
-    if (!Reg)
-      llvm_unreachable("sret virtual register not created in the entry block");
-    SDValue Val = DAG.getCopyFromReg(Chain, dl, Reg, getPointerTy());
-
-    Chain = DAG.getCopyToReg(Chain, dl, Cpu0::V0, Val, Flag);
-    Flag = Chain.getValue(1);
-    RetOps.push_back(DAG.getRegister(Cpu0::V0, getPointerTy()));
+    assert(false && "Not yet implemented");
   }
-#endif
 
   RetOps[0] = Chain;  // Update chain.
 
@@ -725,7 +712,8 @@ Cpu0TargetLowering::LowerReturn(SDValue Chain,
   if (Flag.getNode())
     RetOps.push_back(Flag);
 
-  return DAG.getNode(Cpu0ISD::Ret, dl, MVT::Other, &RetOps[0], RetOps.size());
+  return DAG.getNode(RVLocs.size() == 0 ? Cpu0ISD::Ret : Cpu0ISD::RetValue,
+      dl, MVT::Other, &RetOps[0], RetOps.size());
 }
 
 bool

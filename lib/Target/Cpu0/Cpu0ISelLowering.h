@@ -43,6 +43,7 @@ namespace llvm {
       ThreadPointer,
       // Return
       Ret,
+      RetValue,
 
       // DivRem(u)
       DivRem,
