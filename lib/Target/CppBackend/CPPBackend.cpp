@@ -38,6 +38,8 @@
 #include <set>
 using namespace llvm;
 
+#include <Relooper.h>
+
 static cl::opt<std::string>
 FuncName("cppfname", cl::desc("Specify the name of the generated function"),
          cl::value_desc("function name"));
@@ -155,10 +157,14 @@ namespace {
     void printFunctionUses(const Function *F);
     void printFunctionHead(const Function *F);
     void printFunctionBody(const Function *F);
-    void printInstruction(const Instruction *I, const std::string& bbname);
+    std::string generateInstruction(const Instruction *I);
     std::string getOpName(const Value*);
 
     void printModuleBody();
+
+    unsigned stackAlign(unsigned x) {
+      return x + (x%4 != 0 ? 4 - x%4 : 0);
+    }
   };
 } // end anonymous namespace.
 
@@ -425,38 +431,40 @@ std::string CppWriter::getCppName(const Value* val) {
   if (I != ValueNames.end() && I->first == val)
     return  I->second;
 
-  if (const GlobalVariable* GV = dyn_cast<GlobalVariable>(val)) {
-    name = std::string("gvar_") +
-      getTypePrefix(GV->getType()->getElementType());
-  } else if (isa<Function>(val)) {
-    name = std::string("func_");
-  } else if (const Constant* C = dyn_cast<Constant>(val)) {
-    name = std::string("const_") + getTypePrefix(C->getType());
-  } else if (const Argument* Arg = dyn_cast<Argument>(val)) {
-    if (is_inline) {
-      unsigned argNum = std::distance(Arg->getParent()->arg_begin(),
-                                      Function::const_arg_iterator(Arg)) + 1;
-      name = std::string("arg_") + utostr(argNum);
-      NameSet::iterator NI = UsedNames.find(name);
-      if (NI != UsedNames.end())
-        name += std::string("_") + utostr(uniqueNum++);
-      UsedNames.insert(name);
-      return ValueNames[val] = name;
+  if (val->hasName()) {
+    name = std::string("_") + val->getName().str();
+    sanitize(name);
+  } else {
+    if (const GlobalVariable* GV = dyn_cast<GlobalVariable>(val)) {
+      name = std::string("gvar_") +
+        getTypePrefix(GV->getType()->getElementType());
+    } else if (isa<Function>(val)) {
+      name = std::string("func_");
+    } else if (const Constant* C = dyn_cast<Constant>(val)) {
+      name = std::string("const_") + getTypePrefix(C->getType());
+    } else if (const Argument* Arg = dyn_cast<Argument>(val)) {
+      if (is_inline) {
+        unsigned argNum = std::distance(Arg->getParent()->arg_begin(),
+                                        Function::const_arg_iterator(Arg)) + 1;
+        name = std::string("arg_") + utostr(argNum);
+        NameSet::iterator NI = UsedNames.find(name);
+        if (NI != UsedNames.end())
+          name += std::string("_") + utostr(uniqueNum++);
+        UsedNames.insert(name);
+        return ValueNames[val] = name;
+      } else {
+        name = getTypePrefix(val->getType());
+      }
     } else {
       name = getTypePrefix(val->getType());
     }
-  } else {
-    name = getTypePrefix(val->getType());
-  }
-  if (val->hasName())
-    name += val->getName();
-  else
     name += utostr(uniqueNum++);
-  sanitize(name);
-  NameSet::iterator NI = UsedNames.find(name);
-  if (NI != UsedNames.end())
-    name += std::string("_") + utostr(uniqueNum++);
-  UsedNames.insert(name);
+    sanitize(name);
+    NameSet::iterator NI = UsedNames.find(name);
+    if (NI != UsedNames.end())
+      name += std::string("_") + utostr(uniqueNum++);
+    UsedNames.insert(name);
+  }
   return ValueNames[val] = name;
 }
 
@@ -721,20 +729,16 @@ void CppWriter::printConstant(const Constant *CV) {
   std::string constName(getCppName(CV));
   std::string typeName(getCppName(CV->getType()));
 
+  Out << "var " << constName << " = ";
+
   if (const ConstantInt *CI = dyn_cast<ConstantInt>(CV)) {
     std::string constValue = CI->getValue().toString(10, true);
-    Out << "ConstantInt* " << constName
-        << " = ConstantInt::get(mod->getContext(), APInt("
-        << cast<IntegerType>(CI->getType())->getBitWidth()
-        << ", StringRef(\"" <<  constValue << "\"), 10));";
+    Out << constValue << ";";
   } else if (isa<ConstantAggregateZero>(CV)) {
-    Out << "ConstantAggregateZero* " << constName
-        << " = ConstantAggregateZero::get(" << typeName << ");";
+    Out << "ConstantAggregateZero::get(" << typeName << ");";
   } else if (isa<ConstantPointerNull>(CV)) {
-    Out << "ConstantPointerNull* " << constName
-        << " = ConstantPointerNull::get(" << typeName << ");";
+    Out << "ConstantPointerNull::get(" << typeName << ");";
   } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
-    Out << "ConstantFP* " << constName << " = ";
     printCFP(CFP);
     Out << ";";
   } else if (const ConstantArray *CA = dyn_cast<ConstantArray>(CV)) {
@@ -779,20 +783,13 @@ void CppWriter::printConstant(const Constant *CV) {
   } else if (const ConstantDataSequential *CDS =
                dyn_cast<ConstantDataSequential>(CV)) {
     if (CDS->isString()) {
-      Out << "Constant *" << constName <<
-      " = ConstantDataArray::getString(mod->getContext(), \"";
+      Out << "allocate([";
       StringRef Str = CDS->getAsString();
-      bool nullTerminate = false;
-      if (Str.back() == 0) {
-        Str = Str.drop_back();
-        nullTerminate = true;
+      for (unsigned int i = 0; i < Str.size(); i++) {
+        Out << (unsigned int)(Str.data()[i]);
+        if (i < Str.size()-1) Out << ",";
       }
-      printEscapedString(Str);
-      // Determine if we want null termination or not.
-      if (nullTerminate)
-        Out << "\", true);";
-      else
-        Out << "\", false);";// No null terminator
+      Out << "], 'i8', ALLOC_STATIC);";
     } else {
       // TODO: Could generate more efficient code generating CDS calls instead.
       Out << "std::vector<Constant*> " << constName << "_elems;";
@@ -813,19 +810,12 @@ void CppWriter::printConstant(const Constant *CV) {
     }
   } else if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(CV)) {
     if (CE->getOpcode() == Instruction::GetElementPtr) {
-      Out << "std::vector<Constant*> " << constName << "_indices;";
-      nl(Out);
-      printConstant(CE->getOperand(0));
-      for (unsigned i = 1; i < CE->getNumOperands(); ++i ) {
-        printConstant(CE->getOperand(i));
-        Out << constName << "_indices.push_back("
-            << getCppName(CE->getOperand(i)) << ");";
-        nl(Out);
+      Out << "allocate([";
+      for (unsigned i = 0; i < CE->getNumOperands(); ++i ) {
+        Out << getCppName(CE->getOperand(i));
+        if (i < CE->getNumOperands()-1) Out << ",";
       }
-      Out << "Constant* " << constName
-          << " = ConstantExpr::getGetElementPtr("
-          << getCppName(CE->getOperand(0)) << ", "
-          << constName << "_indices);";
+      Out << "], 'i32', ALLOC_STATIC);";
     } else if (CE->isCast()) {
       printConstant(CE->getOperand(0));
       Out << "Constant* " << constName << " = ConstantExpr::getCast(";
@@ -958,91 +948,19 @@ void CppWriter::printConstants(const Module* M) {
 }
 
 void CppWriter::printVariableUses(const GlobalVariable *GV) {
-  nl(Out) << "// Type Definitions";
-  nl(Out);
-  printType(GV->getType());
-  if (GV->hasInitializer()) {
-    const Constant *Init = GV->getInitializer();
-    printType(Init->getType());
-    if (const Function *F = dyn_cast<Function>(Init)) {
-      nl(Out)<< "/ Function Declarations"; nl(Out);
-      printFunctionHead(F);
-    } else if (const GlobalVariable* gv = dyn_cast<GlobalVariable>(Init)) {
-      nl(Out) << "// Global Variable Declarations"; nl(Out);
-      printVariableHead(gv);
-      
-      nl(Out) << "// Global Variable Definitions"; nl(Out);
-      printVariableBody(gv);
-    } else  {
-      nl(Out) << "// Constant Definitions"; nl(Out);
-      printConstant(Init);
-    }
-  }
 }
 
 void CppWriter::printVariableHead(const GlobalVariable *GV) {
-  nl(Out) << "GlobalVariable* " << getCppName(GV);
-  if (is_inline) {
-    Out << " = mod->getGlobalVariable(mod->getContext(), ";
-    printEscapedString(GV->getName());
-    Out << ", " << getCppName(GV->getType()->getElementType()) << ",true)";
-    nl(Out) << "if (!" << getCppName(GV) << ") {";
-    in(); nl(Out) << getCppName(GV);
-  }
-  Out << " = new GlobalVariable(/*Module=*/*mod, ";
-  nl(Out) << "/*Type=*/";
-  printCppName(GV->getType()->getElementType());
-  Out << ",";
-  nl(Out) << "/*isConstant=*/" << (GV->isConstant()?"true":"false");
-  Out << ",";
-  nl(Out) << "/*Linkage=*/";
-  printLinkageType(GV->getLinkage());
-  Out << ",";
-  nl(Out) << "/*Initializer=*/0, ";
-  if (GV->hasInitializer()) {
-    Out << "// has initializer, specified below";
-  }
-  nl(Out) << "/*Name=*/\"";
-  printEscapedString(GV->getName());
-  Out << "\");";
-  nl(Out);
-
-  if (GV->hasSection()) {
-    printCppName(GV);
-    Out << "->setSection(\"";
-    printEscapedString(GV->getSection());
-    Out << "\");";
-    nl(Out);
-  }
-  if (GV->getAlignment()) {
-    printCppName(GV);
-    Out << "->setAlignment(" << utostr(GV->getAlignment()) << ");";
-    nl(Out);
-  }
-  if (GV->getVisibility() != GlobalValue::DefaultVisibility) {
-    printCppName(GV);
-    Out << "->setVisibility(";
-    printVisibilityType(GV->getVisibility());
-    Out << ");";
-    nl(Out);
-  }
-  if (GV->isThreadLocal()) {
-    printCppName(GV);
-    Out << "->setThreadLocalMode(";
-    printThreadLocalMode(GV->getThreadLocalMode());
-    Out << ");";
-    nl(Out);
-  }
-  if (is_inline) {
-    out(); Out << "}"; nl(Out);
-  }
+  Out << "var ";
+  printCppName(GV);
+  Out << ";\n";
 }
 
 void CppWriter::printVariableBody(const GlobalVariable *GV) {
   if (GV->hasInitializer()) {
     printCppName(GV);
-    Out << "->setInitializer(";
-    Out << getCppName(GV->getInitializer()) << ");";
+    Out << " = ";
+    Out << getCppName(GV->getInitializer()) << ";";
     nl(Out);
   }
 }
@@ -1091,9 +1009,10 @@ static StringRef ConvertAtomicSynchScope(SynchronizationScope SynchScope) {
   llvm_unreachable("Unknown synch scope");
 }
 
-// printInstruction - This member is called for each Instruction in a function.
-void CppWriter::printInstruction(const Instruction *I,
-                                 const std::string& bbname) {
+// generateInstruction - This member is called for each Instruction in a function.
+std::string CppWriter::generateInstruction(const Instruction *I) {
+  std::string text = "NYI: " + std::string(I->getOpcodeName());
+  std::string bbname = "NO_BBNAME";
   std::string iName(getCppName(I));
 
   // Before we emit this instruction, we need to take care of generating any
@@ -1110,24 +1029,23 @@ void CppWriter::printInstruction(const Instruction *I,
 
   case Instruction::Ret: {
     const ReturnInst* ret =  cast<ReturnInst>(I);
-    Out << "ReturnInst::Create(mod->getContext(), "
-        << (ret->getReturnValue() ? opNames[0] + ", " : "") << bbname << ");";
+    text = std::string("return") + (ret->getReturnValue() ? " " + opNames[0] : "") + ";";
     break;
   }
   case Instruction::Br: {
     const BranchInst* br = cast<BranchInst>(I);
-    Out << "BranchInst::Create(" ;
+    text = "// BranchInst::Create(" ;
     if (br->getNumOperands() == 3) {
-      Out << opNames[2] << ", "
-          << opNames[1] << ", "
-          << opNames[0] << ", ";
+      text += opNames[2] + ", "
+            + opNames[1] + ", "
+            + opNames[0] + ", ";
 
     } else if (br->getNumOperands() == 1) {
-      Out << opNames[0] << ", ";
+      text += opNames[0] + ", ";
     } else {
       error("Branch with 2 operands?");
     }
-    Out << bbname << ");";
+    text += bbname + ");";
     break;
   }
   case Instruction::Switch: {
@@ -1267,73 +1185,35 @@ void CppWriter::printInstruction(const Instruction *I,
     break;
   }
   case Instruction::ICmp: {
-    Out << "ICmpInst* " << iName << " = new ICmpInst(*" << bbname << ", ";
+    text = "var " + iName + " = (" + opNames[0] + "|0)";
     switch (cast<ICmpInst>(I)->getPredicate()) {
-    case ICmpInst::ICMP_EQ:  Out << "ICmpInst::ICMP_EQ";  break;
-    case ICmpInst::ICMP_NE:  Out << "ICmpInst::ICMP_NE";  break;
-    case ICmpInst::ICMP_ULE: Out << "ICmpInst::ICMP_ULE"; break;
-    case ICmpInst::ICMP_SLE: Out << "ICmpInst::ICMP_SLE"; break;
-    case ICmpInst::ICMP_UGE: Out << "ICmpInst::ICMP_UGE"; break;
-    case ICmpInst::ICMP_SGE: Out << "ICmpInst::ICMP_SGE"; break;
-    case ICmpInst::ICMP_ULT: Out << "ICmpInst::ICMP_ULT"; break;
-    case ICmpInst::ICMP_SLT: Out << "ICmpInst::ICMP_SLT"; break;
-    case ICmpInst::ICMP_UGT: Out << "ICmpInst::ICMP_UGT"; break;
-    case ICmpInst::ICMP_SGT: Out << "ICmpInst::ICMP_SGT"; break;
-    default: Out << "ICmpInst::BAD_ICMP_PREDICATE"; break;
+    case ICmpInst::ICMP_EQ:  text += "==";  break;
+    case ICmpInst::ICMP_NE:  text += "!=";  break;
+    // TODO: handle signed and unsigned
+    case ICmpInst::ICMP_ULE: text += "<="; break;
+    case ICmpInst::ICMP_SLE: text += "<="; break;
+    case ICmpInst::ICMP_UGE: text += ">="; break;
+    case ICmpInst::ICMP_SGE: text += ">="; break;
+    case ICmpInst::ICMP_ULT: text += "<"; break;
+    case ICmpInst::ICMP_SLT: text += "<"; break;
+    case ICmpInst::ICMP_UGT: text += ">"; break;
+    case ICmpInst::ICMP_SGT: text += ">"; break;
+    default: text += "ICmpInst::BAD_ICMP_PREDICATE"; break;
     }
-    Out << ", " << opNames[0] << ", " << opNames[1] << ", \"";
-    printEscapedString(I->getName());
-    Out << "\");";
+    text += "(" + opNames[1] + "|0);";
     break;
   }
   case Instruction::Alloca: {
     const AllocaInst* allocaI = cast<AllocaInst>(I);
-    Out << "AllocaInst* " << iName << " = new AllocaInst("
-        << getCppName(allocaI->getAllocatedType()) << ", ";
-    if (allocaI->isArrayAllocation())
-      Out << opNames[0] << ", ";
-    Out << "\"";
-    printEscapedString(allocaI->getName());
-    Out << "\", " << bbname << ");";
-    if (allocaI->getAlignment())
-      nl(Out) << iName << "->setAlignment("
-          << allocaI->getAlignment() << ");";
+    text = iName + " = STACKTOP; STACKTOP += " + Twine(stackAlign(allocaI->getAllocatedType()->getScalarSizeInBits()/8)).str() + ";";
     break;
   }
   case Instruction::Load: {
-    const LoadInst* load = cast<LoadInst>(I);
-    Out << "LoadInst* " << iName << " = new LoadInst("
-        << opNames[0] << ", \"";
-    printEscapedString(load->getName());
-    Out << "\", " << (load->isVolatile() ? "true" : "false" )
-        << ", " << bbname << ");";
-    if (load->getAlignment())
-      nl(Out) << iName << "->setAlignment("
-              << load->getAlignment() << ");";
-    if (load->isAtomic()) {
-      StringRef Ordering = ConvertAtomicOrdering(load->getOrdering());
-      StringRef CrossThread = ConvertAtomicSynchScope(load->getSynchScope());
-      nl(Out) << iName << "->setAtomic("
-              << Ordering << ", " << CrossThread << ");";
-    }
+    text = "var " + iName + " = HEAP32[" + opNames[0] + ">>2];";
     break;
   }
   case Instruction::Store: {
-    const StoreInst* store = cast<StoreInst>(I);
-    Out << "StoreInst* " << iName << " = new StoreInst("
-        << opNames[0] << ", "
-        << opNames[1] << ", "
-        << (store->isVolatile() ? "true" : "false")
-        << ", " << bbname << ");";
-    if (store->getAlignment())
-      nl(Out) << iName << "->setAlignment("
-              << store->getAlignment() << ");";
-    if (store->isAtomic()) {
-      StringRef Ordering = ConvertAtomicOrdering(store->getOrdering());
-      StringRef CrossThread = ConvertAtomicSynchScope(store->getSynchScope());
-      nl(Out) << iName << "->setAtomic("
-              << Ordering << ", " << CrossThread << ");";
-    }
+    text = "HEAP32[" + opNames[1] + ">>2] = " + opNames[0] + ";";
     break;
   }
   case Instruction::GetElementPtr: {
@@ -1413,43 +1293,13 @@ void CppWriter::printInstruction(const Instruction *I,
   }
   case Instruction::Call: {
     const CallInst* call = cast<CallInst>(I);
-    if (const InlineAsm* ila = dyn_cast<InlineAsm>(call->getCalledValue())) {
-      Out << "InlineAsm* " << getCppName(ila) << " = InlineAsm::get("
-          << getCppName(ila->getFunctionType()) << ", \""
-          << ila->getAsmString() << "\", \""
-          << ila->getConstraintString() << "\","
-          << (ila->hasSideEffects() ? "true" : "false") << ");";
-      nl(Out);
+    const int numArgs = call->getNumArgOperands();
+    text = std::string(call->getName().data()) + " = " + opNames[numArgs] + "(";
+    for (int i = 0; i < numArgs; i++) {
+      text += opNames[i];
+      if (i < numArgs - 1) text += ", ";
     }
-    if (call->getNumArgOperands() > 1) {
-      Out << "std::vector<Value*> " << iName << "_params;";
-      nl(Out);
-      for (unsigned i = 0; i < call->getNumArgOperands(); ++i) {
-        Out << iName << "_params.push_back(" << opNames[i] << ");";
-        nl(Out);
-      }
-      Out << "CallInst* " << iName << " = CallInst::Create("
-          << opNames[call->getNumArgOperands()] << ", "
-          << iName << "_params, \"";
-    } else if (call->getNumArgOperands() == 1) {
-      Out << "CallInst* " << iName << " = CallInst::Create("
-          << opNames[call->getNumArgOperands()] << ", " << opNames[0] << ", \"";
-    } else {
-      Out << "CallInst* " << iName << " = CallInst::Create("
-          << opNames[call->getNumArgOperands()] << ", \"";
-    }
-    printEscapedString(call->getName());
-    Out << "\", " << bbname << ");";
-    nl(Out) << iName << "->setCallingConv(";
-    printCallingConv(call->getCallingConv());
-    Out << ");";
-    nl(Out) << iName << "->setTailCall("
-        << (call->isTailCall() ? "true" : "false");
-    Out << ");";
-    nl(Out);
-    printAttributes(call->getAttributes(), iName);
-    Out << iName << "->setAttributes(" << iName << "_PAL);";
-    nl(Out);
+    text += ");";
     break;
   }
   case Instruction::Select: {
@@ -1591,8 +1441,8 @@ void CppWriter::printInstruction(const Instruction *I,
   }
   }
   DefinedValues.insert(I);
-  nl(Out);
   delete [] opNames;
+  return text;
 }
 
 // Print out the types, constants and declarations needed by one function
@@ -1773,32 +1623,60 @@ void CppWriter::printFunctionBody(const Function *F) {
     }
   }
 
-  // Create all the basic blocks
-  nl(Out);
+  // Prepare relooper
+  static char *buffer = new char[10*1024*1024]; // XXX
+  Relooper::SetOutputBuffer(buffer);
+  Relooper R;
+  Block *Entry = NULL;
+  std::map<const BasicBlock*, Block*> LLVMToRelooper;
+
+  // Create relooper blocks with their contents
   for (Function::const_iterator BI = F->begin(), BE = F->end();
        BI != BE; ++BI) {
-    std::string bbname(getCppName(BI));
-    Out << "BasicBlock* " << bbname <<
-           " = BasicBlock::Create(mod->getContext(), \"";
-    if (BI->hasName())
-      printEscapedString(BI->getName());
-    Out << "\"," << getCppName(BI->getParent()) << ",0);";
-    nl(Out);
-  }
-
-  // Output all of its basic blocks... for the function
-  for (Function::const_iterator BI = F->begin(), BE = F->end();
-       BI != BE; ++BI) {
-    std::string bbname(getCppName(BI));
-    nl(Out) << "// Block " << BI->getName() << " (" << bbname << ")";
-    nl(Out);
-
-    // Output all of the instructions in the basic block...
+    std::string contents = "";
     for (BasicBlock::const_iterator I = BI->begin(), E = BI->end();
          I != E; ++I) {
-      printInstruction(I,bbname);
+      contents += generateInstruction(I) + "\n";
+    }
+    Block *Curr = new Block(contents.c_str());
+    const BasicBlock *BB = &*BI;
+    LLVMToRelooper[BB] = Curr;
+    R.AddBlock(Curr);
+    if (!Entry) Entry = Curr;
+  }
+
+  // Create branchings
+  for (Function::const_iterator BI = F->begin(), BE = F->end();
+       BI != BE; ++BI) {
+    const TerminatorInst *TI = BI->getTerminator();
+    switch (TI->getOpcode()) {
+    default: {
+      //error("Invalid branch instruction");
+      break;
+    }
+    case Instruction::Br: {
+      const BranchInst* br = cast<BranchInst>(TI);
+      if (br->getNumOperands() == 3) {
+        BasicBlock *S0 = br->getSuccessor(0);
+        BasicBlock *S1 = br->getSuccessor(1);
+        LLVMToRelooper[&*BI]->AddBranchTo(LLVMToRelooper[&*S0], NULL);
+        LLVMToRelooper[&*BI]->AddBranchTo(LLVMToRelooper[&*S1],
+            getOpName(TI->getOperand(0)).c_str());
+      } else if (br->getNumOperands() == 1) {
+        BasicBlock *S = br->getSuccessor(0);
+        LLVMToRelooper[&*BI]->AddBranchTo(LLVMToRelooper[&*S], NULL);
+      } else {
+        error("Branch with 2 operands?");
+      }
+      break;
+    }
     }
   }
+
+  // Calculate relooping and print
+  R.Calculate(Entry);
+  R.Render();
+  Out << buffer;
 
   // Loop over the ForwardRefs and resolve them now that all instructions
   // are generated.
@@ -1846,17 +1724,6 @@ void CppWriter::printInline(const std::string& fname,
 }
 
 void CppWriter::printModuleBody() {
-  // Print out all the type definitions
-  nl(Out) << "// Type Definitions"; nl(Out);
-  printTypes(TheModule);
-
-  // Functions can call each other and global variables can reference them so
-  // define all the functions first before emitting their function bodies.
-  nl(Out) << "// Function Declarations"; nl(Out);
-  for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
-       I != E; ++I)
-    printFunctionHead(I);
-
   // Process the global variables declarations. We can't initialze them until
   // after the constants are printed so just print a header for each global
   nl(Out) << "// Global Variable Declarations\n"; nl(Out);
@@ -1885,12 +1752,10 @@ void CppWriter::printModuleBody() {
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
        I != E; ++I) {
     if (!I->isDeclaration()) {
-      nl(Out) << "// Function: " << I->getName() << " (" << getCppName(I)
-              << ")";
-      nl(Out) << "{";
-      nl(Out,1);
+      Out << "function _" << I->getName() << "() {";
+      nl(Out);
       printFunctionBody(I);
-      nl(Out,-1) << "}";
+      nl(Out) << "}";
       nl(Out);
     }
   }
@@ -1898,64 +1763,12 @@ void CppWriter::printModuleBody() {
 
 void CppWriter::printProgram(const std::string& fname,
                              const std::string& mName) {
-  Out << "#include <llvm/Pass.h>\n";
-  Out << "#include <llvm/PassManager.h>\n";
-
-  Out << "#include <llvm/ADT/SmallVector.h>\n";
-  Out << "#include <llvm/Analysis/Verifier.h>\n";
-  Out << "#include <llvm/Assembly/PrintModulePass.h>\n";
-  Out << "#include <llvm/IR/BasicBlock.h>\n";
-  Out << "#include <llvm/IR/CallingConv.h>\n";
-  Out << "#include <llvm/IR/Constants.h>\n";
-  Out << "#include <llvm/IR/DerivedTypes.h>\n";
-  Out << "#include <llvm/IR/Function.h>\n";
-  Out << "#include <llvm/IR/GlobalVariable.h>\n";
-  Out << "#include <llvm/IR/InlineAsm.h>\n";
-  Out << "#include <llvm/IR/Instructions.h>\n";
-  Out << "#include <llvm/IR/LLVMContext.h>\n";
-  Out << "#include <llvm/IR/Module.h>\n";
-  Out << "#include <llvm/Support/FormattedStream.h>\n";
-  Out << "#include <llvm/Support/MathExtras.h>\n";
-  Out << "#include <algorithm>\n";
-  Out << "using namespace llvm;\n\n";
-  Out << "Module* " << fname << "();\n\n";
-  Out << "int main(int argc, char**argv) {\n";
-  Out << "  Module* Mod = " << fname << "();\n";
-  Out << "  verifyModule(*Mod, PrintMessageAction);\n";
-  Out << "  PassManager PM;\n";
-  Out << "  PM.add(createPrintModulePass(&outs()));\n";
-  Out << "  PM.run(*Mod);\n";
-  Out << "  return 0;\n";
-  Out << "}\n\n";
   printModule(fname,mName);
 }
 
 void CppWriter::printModule(const std::string& fname,
                             const std::string& mName) {
-  nl(Out) << "Module* " << fname << "() {";
-  nl(Out,1) << "// Module Construction";
-  nl(Out) << "Module* mod = new Module(\"";
-  printEscapedString(mName);
-  Out << "\", getGlobalContext());";
-  if (!TheModule->getTargetTriple().empty()) {
-    nl(Out) << "mod->setDataLayout(\"" << TheModule->getDataLayout() << "\");";
-  }
-  if (!TheModule->getTargetTriple().empty()) {
-    nl(Out) << "mod->setTargetTriple(\"" << TheModule->getTargetTriple()
-            << "\");";
-  }
-
-  if (!TheModule->getModuleInlineAsm().empty()) {
-    nl(Out) << "mod->setModuleInlineAsm(\"";
-    printEscapedString(TheModule->getModuleInlineAsm());
-    Out << "\");";
-  }
-  nl(Out);
-
   printModuleBody();
-  nl(Out) << "return mod;";
-  nl(Out,-1) << "}";
-  nl(Out);
 }
 
 void CppWriter::printContents(const std::string& fname,
@@ -2032,7 +1845,7 @@ bool CppWriter::runOnModule(Module &M) {
   TheModule = &M;
 
   // Emit a header
-  Out << "// Generated by llvm2cpp - DO NOT MODIFY!\n\n";
+  Out << "// Generated by llvm2js\n\n";
 
   // Get the name of the function we're supposed to generate
   std::string fname = FuncName.getValue();
