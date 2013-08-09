@@ -1209,7 +1209,19 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::Load: {
-    text = "var " + iName + " = HEAP32[" + opNames[0] + ">>2];";
+    Type *t = dyn_cast<PointerType>(I->getOperand(0)->getType())->getElementType();
+    text = "var " + iName + " = ";
+    switch (t->getTypeID()) {
+    default:
+      assert(false && "Unsupported type");
+    case Type::DoubleTyID:
+      text += "+HEAPF64[" + opNames[0] + ">>2]";
+      break;
+    case Type::IntegerTyID:
+      text += "HEAP32[" + opNames[0] + ">>2]|0";
+      break;
+    }
+    text += ";";
     break;
   }
   case Instruction::Store: {
