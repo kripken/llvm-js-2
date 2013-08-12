@@ -147,6 +147,9 @@ namespace {
     void printType(Type* Ty);
     void printTypes(const Module* M);
 
+    std::string getAssign(const StringRef &, const Type *);
+    std::string getCast(const StringRef &, const Type *);
+
     void printConstant(const Constant *CPV);
     void printConstants(const Module* M);
 
@@ -718,6 +721,34 @@ void CppWriter::printTypes(const Module* M) {
 }
 
 
+std::string CppWriter::getAssign(const StringRef &s, const Type *t) {
+  Out << "var " +  s << " = ";
+  switch (t->getTypeID()) {
+  default:
+    assert(false && "Unsupported type");
+  case Type::DoubleTyID:
+    Out << "+0";
+    break;
+  case Type::IntegerTyID:
+    Out << "0";
+    break;
+  }
+  Out << ";";
+  nl(Out);
+  return (s + " =  ").str();
+}
+
+std::string CppWriter::getCast(const StringRef &s, const Type *t) {
+    switch (t->getTypeID()) {
+    default:
+      assert(false && "Unsupported type");
+    case Type::DoubleTyID:
+      return ("+" + s).str();
+    case Type::IntegerTyID:
+      return (s + "|0").str();
+    }
+}
+
 // printConstant - Print out a constant pool entry...
 void CppWriter::printConstant(const Constant *CV) {
   // First, if the constant is actually a GlobalValue (variable or function)
@@ -1029,7 +1060,13 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
 
   case Instruction::Ret: {
     const ReturnInst* ret =  cast<ReturnInst>(I);
-    text = std::string("return") + (ret->getReturnValue() ? " " + opNames[0] : "") + ";";
+    Value *RV = ret->getReturnValue();
+    text = "return";
+    if (RV == NULL) {
+      text += ";";
+    } else {
+      text += " " + getCast(opNames[0], RV->getType()) + ";";
+    }
     break;
   }
   case Instruction::Br: {
@@ -1185,7 +1222,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::ICmp: {
-    text = "var " + iName + " = (" + opNames[0] + "|0)";
+    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "(" + opNames[0] + "|0)";
     switch (cast<ICmpInst>(I)->getPredicate()) {
     case ICmpInst::ICMP_EQ:  text += "==";  break;
     case ICmpInst::ICMP_NE:  text += "!=";  break;
@@ -1210,7 +1247,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   }
   case Instruction::Load: {
     Type *t = dyn_cast<PointerType>(I->getOperand(0)->getType())->getElementType();
-    text = "var " + iName + " = ";
+    text = getAssign(iName, t);
     switch (t->getTypeID()) {
     default:
       assert(false && "Unsupported type");
@@ -1306,12 +1343,16 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   case Instruction::Call: {
     const CallInst* call = cast<CallInst>(I);
     const int numArgs = call->getNumArgOperands();
-    text = std::string(call->getName().data()) + " = " + opNames[numArgs] + "(";
+    Type *RT = call->getCalledFunction()->getReturnType();
+    text = opNames[numArgs] + "(";
     for (int i = 0; i < numArgs; i++) {
       text += opNames[i];
       if (i < numArgs - 1) text += ", ";
     }
     text += ");";
+    if (!RT->isVoidTy()) {
+      text = getAssign(call->getName(), RT) + getCast(text, RT);
+    }
     break;
   }
   case Instruction::Select: {
@@ -1767,7 +1808,7 @@ void CppWriter::printModuleBody() {
       Out << "function _" << I->getName() << "() {";
       nl(Out);
       printFunctionBody(I);
-      nl(Out) << "}";
+      Out << "}";
       nl(Out);
     }
   }
