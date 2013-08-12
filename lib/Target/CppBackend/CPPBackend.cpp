@@ -226,8 +226,6 @@ void CppWriter::printCFP(const ConstantFP *CFP) {
   APFloat APF = APFloat(CFP->getValueAPF());  // copy
   if (CFP->getType() == Type::getFloatTy(CFP->getContext()))
     APF.convert(APFloat::IEEEdouble, APFloat::rmNearestTiesToEven, &ignored);
-  Out << "ConstantFP::get(mod->getContext(), ";
-  Out << "APFloat(";
 #if HAVE_PRINTF_A
   char Buffer[100];
   sprintf(Buffer, "%A", APF.convertToDouble());
@@ -266,11 +264,9 @@ void CppWriter::printCFP(const ConstantFP *CFP) {
           << utohexstr((uint32_t)CFP->getValueAPF().
                                       bitcastToAPInt().getZExtValue())
           << "U) /* " << StrVal << " */";
-    Out << ")";
 #if HAVE_PRINTF_A
   }
 #endif
-  Out << ")";
 }
 
 void CppWriter::printCallingConv(CallingConv::ID cc){
