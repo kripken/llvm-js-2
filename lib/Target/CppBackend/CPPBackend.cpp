@@ -87,6 +87,7 @@ namespace {
   typedef std::set<std::string> NameSet;
   typedef std::set<Type*> TypeSet;
   typedef std::set<const Value*> ValueSet;
+  typedef std::map<std::string, Type::TypeID> VarMap;
   typedef std::map<const Value*,std::string> ForwardRefMap;
 
   /// CppWriter - This class is the main chunk of code that converts an LLVM
@@ -100,6 +101,7 @@ namespace {
     NameSet UsedNames;
     TypeSet DefinedTypes;
     ValueSet DefinedValues;
+    VarMap UsedVars;
     ForwardRefMap ForwardRefs;
     bool is_inline;
     unsigned indent_level;
@@ -718,20 +720,8 @@ void CppWriter::printTypes(const Module* M) {
 
 
 std::string CppWriter::getAssign(const StringRef &s, const Type *t) {
-  Out << "var " +  s << " = ";
-  switch (t->getTypeID()) {
-  default:
-    assert(false && "Unsupported type");
-  case Type::DoubleTyID:
-    Out << "+0";
-    break;
-  case Type::IntegerTyID:
-    Out << "0";
-    break;
-  }
-  Out << ";";
-  nl(Out);
-  return (s + " =  ").str();
+  UsedVars[s] = t->getTypeID();
+  return (s + " = ").str();
 }
 
 std::string CppWriter::getCast(const StringRef &s, const Type *t) {
@@ -1057,7 +1047,8 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   case Instruction::Ret: {
     const ReturnInst* ret =  cast<ReturnInst>(I);
     Value *RV = ret->getReturnValue();
-    text = "return";
+    text = "STACKTOP = sp;\n";
+    text += "return";
     if (RV == NULL) {
       text += ";";
     } else {
@@ -1238,7 +1229,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   }
   case Instruction::Alloca: {
     const AllocaInst* allocaI = cast<AllocaInst>(I);
-    text = iName + " = STACKTOP; STACKTOP += " + Twine(stackAlign(allocaI->getAllocatedType()->getScalarSizeInBits()/8)).str() + ";";
+    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "STACKTOP; STACKTOP += " + Twine(stackAlign(allocaI->getAllocatedType()->getScalarSizeInBits()/8)).str() + ";";
     break;
   }
   case Instruction::Load: {
@@ -1345,10 +1336,11 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
       text += opNames[i];
       if (i < numArgs - 1) text += ", ";
     }
-    text += ");";
+    text += ")";
     if (!RT->isVoidTy()) {
       text = getAssign(call->getName(), RT) + getCast(text, RT);
     }
+    text += ";";
     break;
   }
   case Instruction::Select: {
@@ -1725,7 +1717,31 @@ void CppWriter::printFunctionBody(const Function *F) {
   // Calculate relooping and print
   R.Calculate(Entry);
   R.Render();
-  Out << buffer;
+  std::string text = getAssign("sp", Type::getInt32Ty(F->getContext())) + "STACKTOP;";
+  if (!UsedVars.empty()) {
+    Out << "var ";
+    for (VarMap::iterator VI = UsedVars.begin(); VI != UsedVars.end(); ++VI) {
+      if (VI != UsedVars.begin()) {
+        Out << ", ";
+      }
+      Out << VI->first << " = ";
+      switch (VI->second) {
+        default:
+          assert(false);
+        case Type::IntegerTyID:
+          Out << "0";
+          break;
+        case Type::FloatTyID:
+        case Type::DoubleTyID:
+          Out << "+0";
+          break;
+      }
+    }
+    Out << ";";
+    nl(Out);
+  }
+  Out << text;
+  nl(Out) << buffer;
 
   // Loop over the ForwardRefs and resolve them now that all instructions
   // are generated.
