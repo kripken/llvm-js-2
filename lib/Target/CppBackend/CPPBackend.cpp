@@ -105,11 +105,15 @@ namespace {
     ForwardRefMap ForwardRefs;
     bool is_inline;
     unsigned indent_level;
+    std::vector<unsigned char> GlobalHeap;
+    std::map<std::string, unsigned> GlobalAddresses;
 
   public:
     static char ID;
     explicit CppWriter(formatted_raw_ostream &o) :
-      ModulePass(ID), Out(o), uniqueNum(0), is_inline(false), indent_level(0){}
+      ModulePass(ID), Out(o), uniqueNum(0), is_inline(false), indent_level(0){
+        GlobalHeap.push_back(-1);
+    }
 
     virtual const char *getPassName() const { return "C++ backend"; }
 
@@ -1233,7 +1237,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::Load: {
-    Type *t = dyn_cast<PointerType>(I->getOperand(0)->getType())->getElementType();
+    Type *t = cast<PointerType>(I->getOperand(0)->getType())->getElementType();
     text = getAssign(iName, t);
     switch (t->getTypeID()) {
     default:
@@ -1249,7 +1253,14 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::Store: {
-    text = "HEAP32[" + opNames[1] + ">>2] = " + opNames[0] + ";";
+    const StoreInst *SI = cast<StoreInst>(I);
+    text = "HEAP32["; // TODO: types
+    if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(SI->getPointerOperand())) {
+      text += "HEAP32[" + utostr(GlobalAddresses[GV->getName().str()] >> 2) + "]";
+    } else {
+      text += opNames[1] + ">>2]";
+    }
+    text += opNames[0] + ";";
     break;
   }
   case Instruction::GetElementPtr: {
@@ -1545,42 +1556,6 @@ void CppWriter::printFunctionUses(const Function* F) {
     }
   }
 
-  // Print the function declarations for any functions encountered
-  nl(Out) << "// Function Declarations"; nl(Out);
-  for (SmallPtrSet<GlobalValue*,64>::iterator I = gvs.begin(), E = gvs.end();
-       I != E; ++I) {
-    if (Function* Fun = dyn_cast<Function>(*I)) {
-      if (!is_inline || Fun != F)
-        printFunctionHead(Fun);
-    }
-  }
-
-  // Print the global variable declarations for any variables encountered
-  nl(Out) << "// Global Variable Declarations"; nl(Out);
-  for (SmallPtrSet<GlobalValue*,64>::iterator I = gvs.begin(), E = gvs.end();
-       I != E; ++I) {
-    if (GlobalVariable* F = dyn_cast<GlobalVariable>(*I))
-      printVariableHead(F);
-  }
-
-  // Print the constants found
-  nl(Out) << "// Constant Definitions"; nl(Out);
-  for (SmallPtrSet<Constant*,64>::iterator I = consts.begin(),
-         E = consts.end(); I != E; ++I) {
-    printConstant(*I);
-  }
-
-  // Process the global variables definitions now that all the constants have
-  // been emitted. These definitions just couple the gvars with their constant
-  // initializers.
-  if (GenerationType != GenFunction) {
-    nl(Out) << "// Global Variable Definitions"; nl(Out);
-    for (SmallPtrSet<GlobalValue*,64>::iterator I = gvs.begin(), E = gvs.end();
-         I != E; ++I) {
-      if (GlobalVariable* GV = dyn_cast<GlobalVariable>(*I))
-        printVariableBody(GV);
-    }
-  }
 }
 
 void CppWriter::printFunctionHead(const Function* F) {
@@ -1733,7 +1708,7 @@ void CppWriter::printFunctionBody(const Function *F) {
           break;
         case Type::FloatTyID:
         case Type::DoubleTyID:
-          Out << "+0";
+          Out << "0.0";
           break;
       }
     }
@@ -1812,6 +1787,50 @@ void CppWriter::printModuleBody() {
     printVariableBody(I);
   }
 
+  for (Module::const_global_iterator I = TheModule->global_begin(),
+       E = TheModule->global_end(); I != E; ++I) {
+    const Constant *CV = I->getInitializer();
+    // TODO: alignment
+    GlobalAddresses[I->getName().str()] = GlobalHeap.size();
+    if (const ConstantDataSequential *CDS =
+           dyn_cast<ConstantDataSequential>(CV)) {
+      if (CDS->isString()) {
+        StringRef Str = CDS->getAsString();
+        for (unsigned int i = 0; i < Str.size(); i++) {
+          GlobalHeap.push_back(Str.data()[i]);
+        }
+      } else {
+        assert(false);
+      }
+    } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
+      APFloat APF = CFP->getValueAPF();
+      if (CFP->getType() == Type::getFloatTy(CFP->getContext())) {
+        union flt { float f; unsigned char b[sizeof(float)]; } flt;
+        flt.f = APF.convertToFloat();
+        for (unsigned i = 0; i < sizeof(float); ++i)
+          GlobalHeap.push_back(flt.b[i]);
+      } else if (CFP->getType() == Type::getDoubleTy(CFP->getContext())) {
+        union dbl { double d; unsigned char b[sizeof(double)]; } dbl;
+        dbl.d = APF.convertToDouble();
+        for (unsigned i = 0; i < sizeof(double); ++i)
+          GlobalHeap.push_back(dbl.b[i]);
+      } else {
+        assert(false);
+      }
+    } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(CV)) {
+      union { uint64_t i; unsigned char b[sizeof(uint64_t)]; } integer;
+      integer.i = *CI->getValue().getRawData();
+      unsigned BitWidth = CI->getValue().getBitWidth();
+      assert(BitWidth == 32 || BitWidth == 64);
+      // assuming compiler is little endian
+      for (unsigned i = 0; i < BitWidth / 8; ++i) {
+        GlobalHeap.push_back(integer.b[i]);
+      }
+    } else {
+      assert(false);
+    }
+  }
+
   // Finally, we can safely put out all of the function bodies.
   nl(Out) << "// Function Definitions"; nl(Out);
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
@@ -1824,6 +1843,18 @@ void CppWriter::printModuleBody() {
       nl(Out);
     }
   }
+
+  nl(Out) << "// Memory allocation"; nl(Out);
+
+  Out << "allocate([";
+  for (std::vector<unsigned char>::iterator I = GlobalHeap.begin();
+       I != GlobalHeap.end(); ++I) {
+    if (I != GlobalHeap.begin()) {
+      Out << ",";
+    }
+    Out << (int)*I;
+  }
+  Out << "], 'i8', ALLOC_STATIC);";
 }
 
 void CppWriter::printProgram(const std::string& fname,
