@@ -147,6 +147,7 @@ namespace {
     void printCFP(const ConstantFP* CFP);
     void printCommaSeparated(const HeapData v);
 
+    void allocateConstant(const Constant* CV);
     unsigned getGlobalAddress(const std::string &s) {
       Address a = GlobalAddresses[s];
       switch (a.second) {
@@ -965,8 +966,11 @@ void CppWriter::printConstants(const Module* M) {
   // Traverse all the global variables looking for constant initializers
   for (Module::const_global_iterator I = TheModule->global_begin(),
          E = TheModule->global_end(); I != E; ++I)
-    if (I->hasInitializer())
-      printConstant(I->getInitializer());
+    if (I->hasInitializer()) {
+      const Constant *CV = I->getInitializer();
+      allocateConstant(CV);
+      GlobalAddresses[I->getName().str()] = GlobalAddresses[getCppName(CV)];
+    }
 
   // Traverse the LLVM functions looking for constants
   for (Module::const_iterator FI = TheModule->begin(), FE = TheModule->end();
@@ -978,7 +982,7 @@ void CppWriter::printConstants(const Module* M) {
            ++I) {
         for (unsigned i = 0; i < I->getNumOperands(); ++i) {
           if (Constant* C = dyn_cast<Constant>(I->getOperand(i))) {
-            printConstant(C);
+            allocateConstant(C);
           }
         }
       }
@@ -1814,64 +1818,6 @@ void CppWriter::printModuleBody() {
     printVariableBody(I);
   }
 
-  for (Module::const_global_iterator I = TheModule->global_begin(),
-       E = TheModule->global_end(); I != E; ++I) {
-    std::string iName = I->getName().str();
-    const Constant *CV = I->getInitializer();
-    if (const ConstantDataSequential *CDS =
-           dyn_cast<ConstantDataSequential>(CV)) {
-      if (CDS->isString()) {
-        GlobalAddresses[iName] = Address(GlobalData8.size(), 8);
-        StringRef Str = CDS->getAsString();
-        for (unsigned int i = 0; i < Str.size(); i++) {
-          GlobalData8.push_back(Str.data()[i]);
-        }
-      } else {
-        assert(false);
-      }
-    } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
-      APFloat APF = CFP->getValueAPF();
-      if (CFP->getType() == Type::getFloatTy(CFP->getContext())) {
-        GlobalAddresses[iName] = Address(GlobalData32.size(), 32);
-        union flt { float f; unsigned char b[sizeof(float)]; } flt;
-        flt.f = APF.convertToFloat();
-        for (unsigned i = 0; i < sizeof(float); ++i)
-          GlobalData32.push_back(flt.b[i]);
-      } else if (CFP->getType() == Type::getDoubleTy(CFP->getContext())) {
-        GlobalAddresses[iName] = Address(GlobalData64.size(), 64);
-        union dbl { double d; unsigned char b[sizeof(double)]; } dbl;
-        dbl.d = APF.convertToDouble();
-        for (unsigned i = 0; i < sizeof(double); ++i)
-          GlobalData64.push_back(dbl.b[i]);
-      } else {
-        assert(false);
-      }
-    } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(CV)) {
-      union { uint64_t i; unsigned char b[sizeof(uint64_t)]; } integer;
-      integer.i = *CI->getValue().getRawData();
-      unsigned BitWidth = CI->getValue().getBitWidth();
-      assert(BitWidth == 32 || BitWidth == 64);
-      HeapData *GlobalData = NULL;
-      switch (BitWidth) {
-        case 32:
-          GlobalData = &GlobalData32;
-          break;
-        case 64:
-          GlobalData = &GlobalData64;
-          break;
-        default:
-          assert(false);
-      }
-      // assuming compiler is little endian
-      GlobalAddresses[iName] = Address(GlobalData->size(), BitWidth);
-      for (unsigned i = 0; i < BitWidth / 8; ++i) {
-        GlobalData->push_back(integer.b[i]);
-      }
-    } else {
-      assert(false);
-    }
-  }
-
   // Finally, we can safely put out all of the function bodies.
   nl(Out) << "// Function Definitions"; nl(Out);
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
@@ -1892,6 +1838,81 @@ void CppWriter::printModuleBody() {
   printCommaSeparated(GlobalData32);
   printCommaSeparated(GlobalData8);
   Out << "], 'i8', ALLOC_STATIC);";
+}
+
+#include <iostream>
+
+void CppWriter::allocateConstant(const Constant* CV) {
+  std::string name = getCppName(CV);
+  if (const ConstantDataSequential *CDS =
+         dyn_cast<ConstantDataSequential>(CV)) {
+    if (CDS->isString()) {
+      GlobalAddresses[name] = Address(GlobalData8.size(), 8);
+      StringRef Str = CDS->getAsString();
+      for (unsigned int i = 0; i < Str.size(); i++) {
+        GlobalData8.push_back(Str.data()[i]);
+      }
+    } else {
+      assert(false);
+    }
+  } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
+    APFloat APF = CFP->getValueAPF();
+    if (CFP->getType() == Type::getFloatTy(CFP->getContext())) {
+      GlobalAddresses[name] = Address(GlobalData32.size(), 32);
+      union flt { float f; unsigned char b[sizeof(float)]; } flt;
+      flt.f = APF.convertToFloat();
+      for (unsigned i = 0; i < sizeof(float); ++i)
+        GlobalData32.push_back(flt.b[i]);
+    } else if (CFP->getType() == Type::getDoubleTy(CFP->getContext())) {
+      GlobalAddresses[name] = Address(GlobalData64.size(), 64);
+      union dbl { double d; unsigned char b[sizeof(double)]; } dbl;
+      dbl.d = APF.convertToDouble();
+      for (unsigned i = 0; i < sizeof(double); ++i)
+        GlobalData64.push_back(dbl.b[i]);
+    } else {
+      assert(false);
+    }
+  } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(CV)) {
+    union { uint64_t i; unsigned char b[sizeof(uint64_t)]; } integer;
+    integer.i = *CI->getValue().getRawData();
+    unsigned BitWidth = CI->getValue().getBitWidth();
+    assert(BitWidth == 32 || BitWidth == 64);
+    HeapData *GlobalData = NULL;
+    switch (BitWidth) {
+      case 32:
+        GlobalData = &GlobalData32;
+        break;
+      case 64:
+        GlobalData = &GlobalData64;
+        break;
+      default:
+        assert(false);
+    }
+    // assuming compiler is little endian
+    GlobalAddresses[name] = Address(GlobalData->size(), BitWidth);
+    for (unsigned i = 0; i < BitWidth / 8; ++i) {
+      GlobalData->push_back(integer.b[i]);
+    }
+  } else if (const ConstantPointerNull *CPN = dyn_cast<ConstantPointerNull>(CV)) {
+    assert(false);
+  } else if (const ConstantAggregateZero *CAZ = dyn_cast<ConstantAggregateZero>(CV)) {
+    assert(false);
+  } else if (const ConstantArray *CAZ = dyn_cast<ConstantArray>(CV)) {
+    assert(false);
+  } else if (const ConstantStruct *CS = dyn_cast<ConstantStruct>(CV)) {
+    assert(false);
+  } else if (const ConstantVector *CVec = dyn_cast<ConstantVector>(CV)) {
+    assert(false);
+  } else if (const BlockAddress *BA = dyn_cast<BlockAddress>(CV)) {
+    assert(false);
+  } else if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(CV)) {
+    assert(false);
+  } else if (const UndefValue *UV = dyn_cast<ConstantExpr>(CV)) {
+    assert(false);
+  } else {
+    std::cout << getCppName(CV) << std::endl;
+    assert(false);
+  }
 }
 
 void CppWriter::printCommaSeparated(const HeapData data) {
