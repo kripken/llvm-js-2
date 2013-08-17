@@ -89,6 +89,8 @@ namespace {
   typedef std::set<const Value*> ValueSet;
   typedef std::map<std::string, Type::TypeID> VarMap;
   typedef std::map<const Value*,std::string> ForwardRefMap;
+  typedef std::vector<unsigned char> HeapData;
+  typedef std::pair<unsigned, unsigned> Address;
 
   /// CppWriter - This class is the main chunk of code that converts an LLVM
   /// module to a C++ translation unit.
@@ -105,14 +107,15 @@ namespace {
     ForwardRefMap ForwardRefs;
     bool is_inline;
     unsigned indent_level;
-    std::vector<unsigned char> GlobalHeap;
-    std::map<std::string, unsigned> GlobalAddresses;
+    HeapData GlobalData8;
+    HeapData GlobalData32;
+    HeapData GlobalData64;
+    std::map<std::string, Address> GlobalAddresses;
 
   public:
     static char ID;
     explicit CppWriter(formatted_raw_ostream &o) :
       ModulePass(ID), Out(o), uniqueNum(0), is_inline(false), indent_level(0){
-        GlobalHeap.push_back(-1);
     }
 
     virtual const char *getPassName() const { return "C++ backend"; }
@@ -142,7 +145,22 @@ namespace {
     void printCallingConv(CallingConv::ID cc);
     void printEscapedString(const std::string& str);
     void printCFP(const ConstantFP* CFP);
+    void printCommaSeparated(const HeapData v);
 
+    unsigned getGlobalAddress(const std::string &s) {
+      Address a = GlobalAddresses[s];
+      switch (a.second) {
+        case 64:
+          return a.first + 8;
+        case 32:
+          return a.first + 8 + GlobalData64.size();
+        case 1:
+          return a.first + 8 + GlobalData64.size() + GlobalData32.size();
+        default:
+          assert(false);
+      }
+    }
+    std::string getPtrLoad(const Value* Ptr);
     std::string getCppName(Type* val);
     inline void printCppName(Type* val);
 
@@ -1030,6 +1048,35 @@ static StringRef ConvertAtomicSynchScope(SynchronizationScope SynchScope) {
   llvm_unreachable("Unknown synch scope");
 }
 
+std::string CppWriter::getPtrLoad(const Value* Ptr) {
+  Type *t = cast<PointerType>(Ptr->getType())->getElementType();
+  if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(Ptr)) {
+    std::string text = "";
+    unsigned Addr = getGlobalAddress(GV->getName().str());
+    switch (t->getTypeID()) {
+    default:
+      assert(false && "Unsupported type");
+    case Type::DoubleTyID:
+      return "+HEAPF64[" + utostr(Addr >> 3) + "]";
+    case Type::FloatTyID:
+      return "+HEAPF32[" + utostr(Addr >> 2) + "]";
+    case Type::IntegerTyID:
+      return "HEAP32[" + utostr(Addr >> 2) + "]|0";
+    }
+  } else {
+    switch (t->getTypeID()) {
+    default:
+      assert(false && "Unsupported type");
+    case Type::DoubleTyID:
+      return "+HEAPF64[" + getOpName(Ptr) + ">>4]";
+    case Type::FloatTyID:
+      return "+HEAPF32[" + getOpName(Ptr) + ">>2]";
+    case Type::IntegerTyID:
+      return "HEAP32[" + getOpName(Ptr) + ">>2]|0";
+    }
+  }
+}
+
 // generateInstruction - This member is called for each Instruction in a function.
 std::string CppWriter::generateInstruction(const Instruction *I) {
   std::string text = "NYI: " + std::string(I->getOpcodeName());
@@ -1061,19 +1108,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::Br: {
-    const BranchInst* br = cast<BranchInst>(I);
-    text = "// BranchInst::Create(" ;
-    if (br->getNumOperands() == 3) {
-      text += opNames[2] + ", "
-            + opNames[1] + ", "
-            + opNames[0] + ", ";
-
-    } else if (br->getNumOperands() == 1) {
-      text += opNames[0] + ", ";
-    } else {
-      error("Branch with 2 operands?");
-    }
-    text += bbname + ");";
+    text = "";
     break;
   }
   case Instruction::Switch: {
@@ -1237,30 +1272,21 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::Load: {
-    Type *t = cast<PointerType>(I->getOperand(0)->getType())->getElementType();
-    text = getAssign(iName, t);
-    switch (t->getTypeID()) {
-    default:
-      assert(false && "Unsupported type");
-    case Type::DoubleTyID:
-      text += "+HEAPF64[" + opNames[0] + ">>2]";
-      break;
-    case Type::IntegerTyID:
-      text += "HEAP32[" + opNames[0] + ">>2]|0";
-      break;
-    }
-    text += ";";
+    const LoadInst *LI = cast<LoadInst>(I);
+    const Value *Ptr = LI->getPointerOperand();
+    Type *t = cast<PointerType>(Ptr->getType())->getElementType();
+    text = getAssign(iName, t) + getPtrLoad(Ptr) + ";";
     break;
   }
   case Instruction::Store: {
     const StoreInst *SI = cast<StoreInst>(I);
     text = "HEAP32["; // TODO: types
     if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(SI->getPointerOperand())) {
-      text += "HEAP32[" + utostr(GlobalAddresses[GV->getName().str()] >> 2) + "]";
+      text += "HEAP32[" + utostr(getGlobalAddress(GV->getName().str())) + "]";
     } else {
       text += opNames[1] + ">>2]";
     }
-    text += opNames[0] + ";";
+    text += " = " + opNames[0] + ";";
     break;
   }
   case Instruction::GetElementPtr: {
@@ -1315,14 +1341,12 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   case Instruction::PtrToInt:
   case Instruction::IntToPtr:
   case Instruction::BitCast: {
-    const CastInst* cst = cast<CastInst>(I);
-    Out << "CastInst* " << iName << " = new ";
     switch (I->getOpcode()) {
     case Instruction::Trunc:    Out << "TruncInst"; break;
     case Instruction::ZExt:     Out << "ZExtInst"; break;
     case Instruction::SExt:     Out << "SExtInst"; break;
     case Instruction::FPTrunc:  Out << "FPTruncInst"; break;
-    case Instruction::FPExt:    Out << "FPExtInst"; break;
+    case Instruction::FPExt:    text = iName + " = " + opNames[0] + ";"; break;
     case Instruction::FPToUI:   Out << "FPToUIInst"; break;
     case Instruction::FPToSI:   Out << "FPToSIInst"; break;
     case Instruction::UIToFP:   Out << "UIToFPInst"; break;
@@ -1332,10 +1356,6 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     case Instruction::BitCast:  Out << "BitCastInst"; break;
     default: llvm_unreachable("Unreachable");
     }
-    Out << "(" << opNames[0] << ", "
-        << getCppName(cst->getType()) << ", \"";
-    printEscapedString(cst->getName());
-    Out << "\", " << bbname << ");";
     break;
   }
   case Instruction::Call: {
@@ -1344,7 +1364,14 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     Type *RT = call->getCalledFunction()->getReturnType();
     text = opNames[numArgs] + "(";
     for (int i = 0; i < numArgs; i++) {
-      text += opNames[i];
+      Value *Arg = call->getArgOperand(i);
+      Type *t = dyn_cast<PointerType>(Arg->getType());
+      const GlobalVariable *GV;
+      if (t && (GV = dyn_cast<GlobalVariable>(Arg))) {
+        text += utostr(getGlobalAddress(GV->getName().str()));
+      } else {
+        text += opNames[i];
+      }
       if (i < numArgs - 1) text += ", ";
     }
     text += ")";
@@ -1789,15 +1816,15 @@ void CppWriter::printModuleBody() {
 
   for (Module::const_global_iterator I = TheModule->global_begin(),
        E = TheModule->global_end(); I != E; ++I) {
+    std::string iName = I->getName().str();
     const Constant *CV = I->getInitializer();
-    // TODO: alignment
-    GlobalAddresses[I->getName().str()] = GlobalHeap.size();
     if (const ConstantDataSequential *CDS =
            dyn_cast<ConstantDataSequential>(CV)) {
       if (CDS->isString()) {
+        GlobalAddresses[iName] = Address(GlobalData8.size(), 8);
         StringRef Str = CDS->getAsString();
         for (unsigned int i = 0; i < Str.size(); i++) {
-          GlobalHeap.push_back(Str.data()[i]);
+          GlobalData8.push_back(Str.data()[i]);
         }
       } else {
         assert(false);
@@ -1805,15 +1832,17 @@ void CppWriter::printModuleBody() {
     } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
       APFloat APF = CFP->getValueAPF();
       if (CFP->getType() == Type::getFloatTy(CFP->getContext())) {
+        GlobalAddresses[iName] = Address(GlobalData32.size(), 32);
         union flt { float f; unsigned char b[sizeof(float)]; } flt;
         flt.f = APF.convertToFloat();
         for (unsigned i = 0; i < sizeof(float); ++i)
-          GlobalHeap.push_back(flt.b[i]);
+          GlobalData32.push_back(flt.b[i]);
       } else if (CFP->getType() == Type::getDoubleTy(CFP->getContext())) {
+        GlobalAddresses[iName] = Address(GlobalData64.size(), 64);
         union dbl { double d; unsigned char b[sizeof(double)]; } dbl;
         dbl.d = APF.convertToDouble();
         for (unsigned i = 0; i < sizeof(double); ++i)
-          GlobalHeap.push_back(dbl.b[i]);
+          GlobalData64.push_back(dbl.b[i]);
       } else {
         assert(false);
       }
@@ -1822,9 +1851,21 @@ void CppWriter::printModuleBody() {
       integer.i = *CI->getValue().getRawData();
       unsigned BitWidth = CI->getValue().getBitWidth();
       assert(BitWidth == 32 || BitWidth == 64);
+      HeapData *GlobalData = NULL;
+      switch (BitWidth) {
+        case 32:
+          GlobalData = &GlobalData32;
+          break;
+        case 64:
+          GlobalData = &GlobalData64;
+          break;
+        default:
+          assert(false);
+      }
       // assuming compiler is little endian
+      GlobalAddresses[iName] = Address(GlobalData->size(), BitWidth);
       for (unsigned i = 0; i < BitWidth / 8; ++i) {
-        GlobalHeap.push_back(integer.b[i]);
+        GlobalData->push_back(integer.b[i]);
       }
     } else {
       assert(false);
@@ -1846,15 +1887,21 @@ void CppWriter::printModuleBody() {
 
   nl(Out) << "// Memory allocation"; nl(Out);
 
-  Out << "allocate([";
-  for (std::vector<unsigned char>::iterator I = GlobalHeap.begin();
-       I != GlobalHeap.end(); ++I) {
-    if (I != GlobalHeap.begin()) {
+  Out << "allocate([-1,0,0,0,0,0,0,0,";
+  printCommaSeparated(GlobalData64);
+  printCommaSeparated(GlobalData32);
+  printCommaSeparated(GlobalData8);
+  Out << "], 'i8', ALLOC_STATIC);";
+}
+
+void CppWriter::printCommaSeparated(const HeapData data) {
+  for (HeapData::const_iterator I = data.begin();
+       I != data.end(); ++I) {
+    if (I != data.begin()) {
       Out << ",";
     }
     Out << (int)*I;
   }
-  Out << "], 'i8', ALLOC_STATIC);";
 }
 
 void CppWriter::printProgram(const std::string& fname,
