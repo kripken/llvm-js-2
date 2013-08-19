@@ -1286,7 +1286,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     const StoreInst *SI = cast<StoreInst>(I);
     text = "HEAP32["; // TODO: types
     if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(SI->getPointerOperand())) {
-      text += "HEAP32[" + utostr(getGlobalAddress(GV->getName().str())) + "]";
+      text += utostr(getGlobalAddress(GV->getName().str())) + "]";
     } else {
       text += opNames[1] + ">>2]";
     }
@@ -1897,7 +1897,7 @@ void CppWriter::allocateConstant(const Constant* CV) {
     assert(false);
   } else if (const ConstantAggregateZero *CAZ = dyn_cast<ConstantAggregateZero>(CV)) {
     assert(false);
-  } else if (const ConstantArray *CAZ = dyn_cast<ConstantArray>(CV)) {
+  } else if (const ConstantArray *CA = dyn_cast<ConstantArray>(CV)) {
     assert(false);
   } else if (const ConstantStruct *CS = dyn_cast<ConstantStruct>(CV)) {
     assert(false);
