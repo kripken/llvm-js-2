@@ -1843,6 +1843,9 @@ void CppWriter::printModuleBody() {
 #include <iostream>
 
 void CppWriter::allocateConstant(const Constant* CV) {
+  if (isa<GlobalValue>(CV))
+    return;
+
   std::string name = getCppName(CV);
   if (const ConstantDataSequential *CDS =
          dyn_cast<ConstantDataSequential>(CV)) {
@@ -1906,8 +1909,14 @@ void CppWriter::allocateConstant(const Constant* CV) {
   } else if (const BlockAddress *BA = dyn_cast<BlockAddress>(CV)) {
     assert(false);
   } else if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(CV)) {
-    assert(false);
-  } else if (const UndefValue *UV = dyn_cast<ConstantExpr>(CV)) {
+    if (CE->getOpcode() == Instruction::GetElementPtr) {
+        assert(false && "Unhandled CE GEP");
+    } else if (CE->isCast()) {
+        assert(false && "Unhandled cast");
+    } else {
+        assert(false);
+    }
+  } else if (const UndefValue *UV = dyn_cast<UndefValue>(CV)) {
     assert(false);
   } else {
     std::cout << getCppName(CV) << std::endl;
