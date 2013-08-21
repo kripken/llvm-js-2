@@ -1,0 +1,4 @@
+pnacl-opt -pnacl-abi-simplify-preopt $1 > temp1
+pnacl-opt -O2 temp1 > temp2
+pnacl-opt -pnacl-abi-simplify-postopt temp2 > $1
+rm -f temp1 temp2
