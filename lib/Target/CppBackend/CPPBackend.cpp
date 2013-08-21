@@ -1076,6 +1076,7 @@ std::string CppWriter::getPtrLoad(const Value* Ptr) {
     case Type::FloatTyID:
       return "+HEAPF32[" + getOpName(Ptr) + ">>2]";
     case Type::IntegerTyID:
+    case Type::PointerTyID:
       return "HEAP32[" + getOpName(Ptr) + ">>2]|0";
     }
   }
@@ -1734,6 +1735,7 @@ void CppWriter::printFunctionBody(const Function *F) {
       switch (VI->second) {
         default:
           assert(false);
+        case Type::PointerTyID:
         case Type::IntegerTyID:
           Out << "0";
           break;
