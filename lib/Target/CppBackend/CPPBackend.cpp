@@ -162,8 +162,10 @@ namespace {
       }
     }
     std::string getPtrLoad(const Value* Ptr);
+    std::string getPtrUse(const Value* Ptr);
     std::string getPtr(const Value* Ptr);
     std::string getConstant(const Constant*);
+    std::string getValueAsStr(const Value*);
     std::string getCppName(Type* val);
     inline void printCppName(Type* val);
 
@@ -753,9 +755,11 @@ std::string CppWriter::getCast(const StringRef &s, const Type *t) {
     switch (t->getTypeID()) {
     default:
       assert(false && "Unsupported type");
+    case Type::FloatTyID:
     case Type::DoubleTyID:
       return ("+" + s).str();
     case Type::IntegerTyID:
+    case Type::PointerTyID:
       return (s + "|0").str();
     }
 }
@@ -1056,6 +1060,11 @@ static StringRef ConvertAtomicSynchScope(SynchronizationScope SynchScope) {
 
 std::string CppWriter::getPtrLoad(const Value* Ptr) {
   Type *t = cast<PointerType>(Ptr->getType())->getElementType();
+  return getCast(getPtrUse(Ptr), t);
+}
+
+std::string CppWriter::getPtrUse(const Value* Ptr) {
+  Type *t = cast<PointerType>(Ptr->getType())->getElementType();
   if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(Ptr)) {
     std::string text = "";
     unsigned Addr = getGlobalAddress(GV->getName().str());
@@ -1063,23 +1072,23 @@ std::string CppWriter::getPtrLoad(const Value* Ptr) {
     default:
       assert(false && "Unsupported type");
     case Type::DoubleTyID:
-      return "+HEAPF64[" + utostr(Addr >> 3) + "]";
+      return "HEAPF64[" + utostr(Addr >> 3) + "]";
     case Type::FloatTyID:
-      return "+HEAPF32[" + utostr(Addr >> 2) + "]";
+      return "HEAPF32[" + utostr(Addr >> 2) + "]";
     case Type::IntegerTyID:
-      return "HEAP32[" + utostr(Addr >> 2) + "]|0";
+      return "HEAP32[" + utostr(Addr >> 2) + "]";
     }
   } else {
     switch (t->getTypeID()) {
     default:
       assert(false && "Unsupported type");
     case Type::DoubleTyID:
-      return "+HEAPF64[" + getOpName(Ptr) + ">>4]";
+      return "HEAPF64[" + getOpName(Ptr) + ">>4]";
     case Type::FloatTyID:
-      return "+HEAPF32[" + getOpName(Ptr) + ">>2]";
+      return "HEAPF32[" + getOpName(Ptr) + ">>2]";
     case Type::IntegerTyID:
     case Type::PointerTyID:
-      return "HEAP32[" + getOpName(Ptr) + ">>2]|0";
+      return "HEAP32[" + getOpName(Ptr) + ">>2]";
     }
   }
 }
@@ -1122,6 +1131,14 @@ std::string CppWriter::getConstant(const Constant* CV) {
   }
 }
 
+std::string CppWriter::getValueAsStr(const Value* V) {
+  if (const Constant *CV = dyn_cast<Constant>(V)) {
+    return getConstant(CV);
+  } else {
+    return getCast(getCppName(V), V->getType());
+  }
+}
+
 // generateInstruction - This member is called for each Instruction in a function.
 std::string CppWriter::generateInstruction(const Instruction *I) {
   std::string text = "NYI: " + std::string(I->getOpcodeName());
@@ -1148,7 +1165,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     if (RV == NULL) {
       text += ";";
     } else {
-      text += " " + getCast(opNames[0], RV->getType()) + ";";
+      text += " " + getValueAsStr(RV) + ";";
     }
     break;
   }
@@ -1293,7 +1310,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::ICmp: {
-    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "(" + opNames[0] + "|0)";
+    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "(" + getValueAsStr(I->getOperand(0)) + ")";
     switch (cast<ICmpInst>(I)->getPredicate()) {
     case ICmpInst::ICMP_EQ:  text += "==";  break;
     case ICmpInst::ICMP_NE:  text += "!=";  break;
@@ -1308,12 +1325,12 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     case ICmpInst::ICMP_SGT: text += ">"; break;
     default: text += "ICmpInst::BAD_ICMP_PREDICATE"; break;
     }
-    text += "(" + opNames[1] + "|0);";
+    text += "(" + getValueAsStr(I->getOperand(1)) + ")";
     break;
   }
   case Instruction::Alloca: {
     const AllocaInst* allocaI = cast<AllocaInst>(I);
-    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "STACKTOP; STACKTOP += " + Twine(stackAlign(allocaI->getAllocatedType()->getScalarSizeInBits()/8)).str() + ";";
+    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "STACKTOP; STACKTOP = STACKTOP + " + Twine(stackAlign(allocaI->getAllocatedType()->getScalarSizeInBits()/8)).str() + "|0;";
     break;
   }
   case Instruction::Load: {
@@ -1325,19 +1342,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   }
   case Instruction::Store: {
     const StoreInst *SI = cast<StoreInst>(I);
-    text = "HEAP32["; // TODO: types
-    if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(SI->getPointerOperand())) {
-      text += utostr(getGlobalAddress(GV->getName().str())) + "]";
-    } else {
-      text += opNames[1] + ">>2]";
-    }
-    text += " = ";
-    if (const Constant *CV = dyn_cast<Constant>(SI->getValueOperand())) {
-      text += getConstant(CV);
-    } else {
-      text += opNames[0];
-    }
-    text += ";";
+    text = getPtrUse(SI->getPointerOperand()) + " = " + getValueAsStr(SI->getValueOperand()) + ";";
     break;
   }
   case Instruction::GetElementPtr: {
@@ -1382,7 +1387,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     case Instruction::ZExt:     Out << "ZExtInst"; break;
     case Instruction::SExt:     Out << "SExtInst"; break;
     case Instruction::FPTrunc:  Out << "FPTruncInst"; break;
-    case Instruction::FPExt:    text = iName + " = " + opNames[0] + ";"; break;
+    case Instruction::FPExt:    text = getAssign(iName, Type::getFloatTy(I->getContext())) + opNames[0] + ";"; break;
     case Instruction::FPToUI:   Out << "FPToUIInst"; break;
     case Instruction::FPToSI:   Out << "FPToSIInst"; break;
     case Instruction::UIToFP:   Out << "UIToFPInst"; break;
@@ -1407,6 +1412,9 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
         text += utostr(getGlobalAddress(GV->getName().str()));
       } else {
         text += opNames[i];
+        if (Arg->getType()->isIntegerTy() || Arg->getType()->isPointerTy()) {
+          text += "|0";
+        }
       }
       if (i < numArgs - 1) text += ", ";
     }
@@ -1686,13 +1694,12 @@ void CppWriter::printFunctionBody(const Function *F) {
   if (!is_inline) {
     for (Function::const_arg_iterator AI = F->arg_begin(), AE = F->arg_end();
          AI != AE; ++AI) {
-      //Out << "Value* " << getCppName(AI) << " = args++;";
-      //nl(Out);
       if (AI->hasName()) {
         //Out << getCppName(AI) << "->setName(\"";
         //printEscapedString(AI->getName());
         //Out << "\");";
         //nl(Out);
+      } else {
       }
     }
   }
@@ -1851,8 +1858,22 @@ void CppWriter::printModuleBody() {
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
        I != E; ++I) {
     if (!I->isDeclaration()) {
-      Out << "function _" << I->getName() << "() {";
+      Out << "function _" << I->getName() << "(";
+      for (Function::const_arg_iterator AI = I->arg_begin(), AE = I->arg_end();
+           AI != AE; ++AI) {
+        Out << getCppName(AI);
+        if (AI != I->arg_begin()) {
+          Out << ", ";
+        }
+      }
+      Out << ") {";
       nl(Out);
+      for (Function::const_arg_iterator AI = I->arg_begin(), AE = I->arg_end();
+           AI != AE; ++AI) {
+        std::string name = getCppName(AI);
+        Out << name << " = " << getCast(name, AI->getType()) << ";";
+        nl(Out);
+      }
       printFunctionBody(I);
       Out << "}";
       nl(Out);
@@ -1861,11 +1882,11 @@ void CppWriter::printModuleBody() {
 
   nl(Out) << "// Memory allocation"; nl(Out);
 
-  Out << "allocate([-1,0,0,0,0,0,0,0,";
+  Out << "allocate([";
   printCommaSeparated(GlobalData64);
   printCommaSeparated(GlobalData32);
   printCommaSeparated(GlobalData8);
-  Out << "], 'i8', ALLOC_STATIC);";
+  Out << "], 'i8', ALLOC_NONE, Runtime.GLOBAL_BASE);";
 }
 
 #include <iostream>
