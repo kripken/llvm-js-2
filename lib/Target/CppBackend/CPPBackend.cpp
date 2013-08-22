@@ -155,13 +155,14 @@ namespace {
           return a.first + 8;
         case 32:
           return a.first + 8 + GlobalData64.size();
-        case 1:
+        case 8:
           return a.first + 8 + GlobalData64.size() + GlobalData32.size();
         default:
           assert(false);
       }
     }
     std::string getPtrLoad(const Value* Ptr);
+    std::string getPtr(const Value* Ptr);
     std::string getCppName(Type* val);
     inline void printCppName(Type* val);
 
@@ -1082,6 +1083,30 @@ std::string CppWriter::getPtrLoad(const Value* Ptr) {
   }
 }
 
+std::string CppWriter::getPtr(const Value* Ptr) {
+  Type *t = cast<PointerType>(Ptr->getType())->getElementType();
+  if (const Constant *CV = dyn_cast<Constant>(Ptr)) {
+    std::string text = "";
+    unsigned Addr = getGlobalAddress(CV->getName().str());
+    switch (t->getTypeID()) {
+    default:
+      assert(false && "Unsupported type");
+    case Type::DoubleTyID:
+      return utostr(Addr >> 3);
+    case Type::FloatTyID:
+      return utostr(Addr >> 2);
+    case Type::ArrayTyID:
+    case Type::StructTyID:
+    case Type::PointerTyID:
+    case Type::VectorTyID:
+    case Type::IntegerTyID:
+      return utostr(Addr >> 2);
+    }
+  } else {
+    return getOpName(Ptr) + "|0";
+  }
+}
+
 // generateInstruction - This member is called for each Instruction in a function.
 std::string CppWriter::generateInstruction(const Instruction *I) {
   std::string text = "NYI: " + std::string(I->getOpcodeName());
@@ -1295,26 +1320,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     break;
   }
   case Instruction::GetElementPtr: {
-    const GetElementPtrInst* gep = cast<GetElementPtrInst>(I);
-    if (gep->getNumOperands() <= 2) {
-      Out << "GetElementPtrInst* " << iName << " = GetElementPtrInst::Create("
-          << opNames[0];
-      if (gep->getNumOperands() == 2)
-        Out << ", " << opNames[1];
-    } else {
-      Out << "std::vector<Value*> " << iName << "_indices;";
-      nl(Out);
-      for (unsigned i = 1; i < gep->getNumOperands(); ++i ) {
-        Out << iName << "_indices.push_back("
-            << opNames[i] << ");";
-        nl(Out);
-      }
-      Out << "Instruction* " << iName << " = GetElementPtrInst::Create("
-          << opNames[0] << ", " << iName << "_indices";
-    }
-    Out << ", \"";
-    printEscapedString(gep->getName());
-    Out << "\", " << bbname << ");";
+    assert(false && "Unhandled instruction");
     break;
   }
   case Instruction::PHI: {
@@ -1334,6 +1340,12 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     }
     break;
   }
+  case Instruction::PtrToInt:
+    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + getPtr(I->getOperand(0)) + ";";
+    break;
+  case Instruction::IntToPtr:
+    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + opNames[0] + ";";
+    break;
   case Instruction::Trunc:
   case Instruction::ZExt:
   case Instruction::SExt:
@@ -1343,8 +1355,6 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   case Instruction::FPToSI:
   case Instruction::UIToFP:
   case Instruction::SIToFP:
-  case Instruction::PtrToInt:
-  case Instruction::IntToPtr:
   case Instruction::BitCast: {
     switch (I->getOpcode()) {
     case Instruction::Trunc:    Out << "TruncInst"; break;
