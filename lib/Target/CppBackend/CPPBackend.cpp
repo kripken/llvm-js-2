@@ -1882,9 +1882,16 @@ void CppWriter::printModuleBody() {
 
   nl(Out) << "// Memory allocation"; nl(Out);
 
+  // TODO fix commas
   Out << "allocate([";
   printCommaSeparated(GlobalData64);
+  if (GlobalData64.size() > 0 && GlobalData32.size() > 0) {
+    Out << ",";
+  }
   printCommaSeparated(GlobalData32);
+  if (GlobalData32.size() > 0 && GlobalData8.size() > 0) {
+    Out << ",";
+  }
   printCommaSeparated(GlobalData8);
   Out << "], 'i8', ALLOC_NONE, Runtime.GLOBAL_BASE);";
 }
