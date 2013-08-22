@@ -163,6 +163,7 @@ namespace {
     }
     std::string getPtrLoad(const Value* Ptr);
     std::string getPtr(const Value* Ptr);
+    std::string getConstant(const Constant*);
     std::string getCppName(Type* val);
     inline void printCppName(Type* val);
 
@@ -1107,6 +1108,20 @@ std::string CppWriter::getPtr(const Value* Ptr) {
   }
 }
 
+std::string CppWriter::getConstant(const Constant* CV) {
+  if (const PointerType *Ptr = dyn_cast<PointerType>(CV->getType())) {
+    return getPtr(CV);
+  } else {
+    if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
+      return ftostr(CFP->getValueAPF());
+    } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(CV)) {
+      return CI->getValue().toString(10, true);
+    } else {
+      assert(false);
+    }
+  }
+}
+
 // generateInstruction - This member is called for each Instruction in a function.
 std::string CppWriter::generateInstruction(const Instruction *I) {
   std::string text = "NYI: " + std::string(I->getOpcodeName());
@@ -1316,7 +1331,13 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     } else {
       text += opNames[1] + ">>2]";
     }
-    text += " = " + opNames[0] + ";";
+    text += " = ";
+    if (const Constant *CV = dyn_cast<Constant>(SI->getValueOperand())) {
+      text += getConstant(CV);
+    } else {
+      text += opNames[0];
+    }
+    text += ";";
     break;
   }
   case Instruction::GetElementPtr: {
@@ -1663,20 +1684,15 @@ void CppWriter::printFunctionBody(const Function *F) {
 
   // Create all the argument values
   if (!is_inline) {
-    if (!F->arg_empty()) {
-      Out << "Function::arg_iterator args = " << getCppName(F)
-          << "->arg_begin();";
-      nl(Out);
-    }
     for (Function::const_arg_iterator AI = F->arg_begin(), AE = F->arg_end();
          AI != AE; ++AI) {
-      Out << "Value* " << getCppName(AI) << " = args++;";
-      nl(Out);
+      //Out << "Value* " << getCppName(AI) << " = args++;";
+      //nl(Out);
       if (AI->hasName()) {
-        Out << getCppName(AI) << "->setName(\"";
-        printEscapedString(AI->getName());
-        Out << "\");";
-        nl(Out);
+        //Out << getCppName(AI) << "->setName(\"";
+        //printEscapedString(AI->getName());
+        //Out << "\");";
+        //nl(Out);
       }
     }
   }
