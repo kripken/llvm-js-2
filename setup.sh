@@ -1,4 +1,4 @@
-BUILD_DIR=build2
+BUILD_DIR=build
 # BUILD_DIR must be empty, or cmake may loop indefinitely
 mkdir $BUILD_DIR
 cd $BUILD_DIR
