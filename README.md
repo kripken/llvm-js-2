@@ -17,6 +17,9 @@ Usage
 
 We want to have PNaCl-ized LLVM IR as input, as that is easier to compile.
 
+[Instructions to install PNaCl.](https://developers.google.com/native-client/sdk/download)
+`llvm-js-2` was tested against `pepper_29`.
+
 Assuming the `pwd` is `build`, do the following:
 
     pnacl-clang -c hello_world.c
