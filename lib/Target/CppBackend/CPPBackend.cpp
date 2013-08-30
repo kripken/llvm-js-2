@@ -1083,7 +1083,7 @@ std::string CppWriter::getPtrUse(const Value* Ptr) {
     default:
       assert(false && "Unsupported type");
     case Type::DoubleTyID:
-      return "HEAPF64[" + getOpName(Ptr) + ">>4]";
+      return "HEAPF64[" + getOpName(Ptr) + ">>3]";
     case Type::FloatTyID:
       return "HEAPF32[" + getOpName(Ptr) + ">>2]";
     case Type::IntegerTyID:
@@ -1256,9 +1256,10 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   case Instruction::Shl:
   case Instruction::LShr:
   case Instruction::AShr:{
-    Out << "BinaryOperator* " << iName << " = BinaryOperator::Create(";
+    //Out << "BinaryOperator* " << iName << " = BinaryOperator::Create(";
+    text = getAssign(iName, Type::getInt32Ty(I->getContext()));
     switch (I->getOpcode()) {
-    case Instruction::Add: Out << "Instruction::Add"; break;
+    case Instruction::Add: text += getCast(opNames[0] + " + " + getValueAsStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
     case Instruction::FAdd: Out << "Instruction::FAdd"; break;
     case Instruction::Sub: Out << "Instruction::Sub"; break;
     case Instruction::FSub: Out << "Instruction::FSub"; break;
@@ -1278,9 +1279,9 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     case Instruction::AShr:Out << "Instruction::AShr"; break;
     default: Out << "Instruction::BadOpCode"; break;
     }
-    Out << ", " << opNames[0] << ", " << opNames[1] << ", \"";
-    printEscapedString(I->getName());
-    Out << "\", " << bbname << ");";
+    //Out << ", " << opNames[0] << ", " << opNames[1] << ", \"";
+    //printEscapedString(I->getName());
+    //Out << "\", " << bbname << ");";
     break;
   }
   case Instruction::FCmp: {
@@ -1330,7 +1331,14 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   }
   case Instruction::Alloca: {
     const AllocaInst* allocaI = cast<AllocaInst>(I);
-    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "STACKTOP; STACKTOP = STACKTOP + " + Twine(stackAlign(allocaI->getAllocatedType()->getScalarSizeInBits()/8)).str() + "|0;";
+    Type *t = allocaI->getAllocatedType();
+    unsigned size;
+    if (ArrayType *AT = dyn_cast<ArrayType>(t)) {
+      size = AT->getElementType()->getScalarSizeInBits()/8 * AT->getNumElements();
+    } else {
+      size = t->getScalarSizeInBits()/8;
+    }
+    text = getAssign(iName, Type::getInt32Ty(I->getContext())) + "STACKTOP; STACKTOP = STACKTOP + " + Twine(stackAlign(size)).str() + "|0;";
     break;
   }
   case Instruction::Load: {
@@ -1400,7 +1408,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     case Instruction::SIToFP:   Out << "SIToFPInst"; break;
     case Instruction::PtrToInt: Out << "PtrToIntInst"; break;
     case Instruction::IntToPtr: Out << "IntToPtrInst"; break;
-    case Instruction::BitCast:  Out << "BitCastInst"; break;
+    case Instruction::BitCast:  text = getAssign(iName, I->getOperand(0)->getType()) + getValueAsStr(I->getOperand(0)) + ";"; break;
     default: llvm_unreachable("Unreachable");
     }
     break;
