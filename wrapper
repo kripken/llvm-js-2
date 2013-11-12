@@ -8,5 +8,7 @@ echo "d"
 ~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-opt -pnacl-abi-simplify-postopt temp2 > $1.post.bc
 rm -f temp1 temp2
 echo "e"
+~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-dis $1.post.bc > $1.ll
+echo "f"
 ~/Dev/int3-llvmwork/build/bin/llc -march=js -filetype=asm $1.post.bc -o $1.js
 
