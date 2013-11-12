@@ -1,14 +1,14 @@
 echo "a"
 ~/Dev/emscripten/emcc $1 -c -o $1.bc
 echo "b"
-~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-opt -pnacl-abi-simplify-preopt $1.bc > temp1
+~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-opt -pnacl-abi-simplify-preopt $1.bc > $1.pre.bc
+~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-dis $1.pre.bc > $1.pre.ll
 echo "c"
-~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-opt -O2 temp1 > temp2
+~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-opt -O2 $1.pre.bc -o $1.opt.bc
+~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-dis $1.opt.bc > $1.opt.ll
 echo "d"
-~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-opt -pnacl-abi-simplify-postopt temp2 > $1.post.bc
-rm -f temp1 temp2
-echo "e"
-~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-dis $1.post.bc > $1.ll
+~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-opt -pnacl-abi-simplify-postopt $1.opt.bc > $1.post.bc
+~/Dev/nacl_sdk/pepper_29/toolchain/linux_x86_pnacl/newlib/bin/pnacl-dis $1.post.bc > $1.post.ll
 echo "f"
 ~/Dev/int3-llvmwork/build/bin/llc -march=js -filetype=asm $1.post.bc -o $1.js
 
