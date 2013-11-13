@@ -1969,7 +1969,8 @@ void CppWriter::allocateConstant(const Constant* CV) {
   } else if (const ConstantPointerNull *CPN = dyn_cast<ConstantPointerNull>(CV)) {
     assert(false);
   } else if (const ConstantAggregateZero *CAZ = dyn_cast<ConstantAggregateZero>(CV)) {
-    assert(false);
+    printf("Warning: ignoring CAZ\n");
+    //Constant *C = CAZ->getSequentialElement();
   } else if (const ConstantArray *CA = dyn_cast<ConstantArray>(CV)) {
     assert(false);
   } else if (const ConstantStruct *CS = dyn_cast<ConstantStruct>(CV)) {
