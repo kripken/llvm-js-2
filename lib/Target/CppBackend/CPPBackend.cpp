@@ -1844,12 +1844,10 @@ void CppWriter::printInline(const std::string& fname,
 }
 
 void CppWriter::printModuleBody() {
-  // Print out all the constants definitions. Constants don't recurse except
-  // through GlobalValues. All GlobalValues have been declared at this point
-  // so we can proceed to generate the constants.
+  // Calculate the constants definitions.
   printConstants(TheModule);
 
-  // Finally, we can safely put out all of the function bodies.
+  // Emit function bodies.
   nl(Out) << "// Function Definitions"; nl(Out);
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
        I != E; ++I) {
@@ -1890,6 +1888,26 @@ void CppWriter::printModuleBody() {
   }
   printCommaSeparated(GlobalData8);
   Out << "], 'i8', ALLOC_NONE, Runtime.GLOBAL_BASE);";
+
+  // Emit metadata for emcc driver
+  Out << "\n\n// EM_METADATA\n";
+  Out << "{\n";
+
+  Out << "declares: [";
+  bool first = false;
+  for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
+       I != E; ++I) {
+    if (I->isDeclaration()) {
+      if (first) {
+        first = false;
+        Out << ", ";
+      }
+      Out << "\"" + I->getName() + "\"";
+    }
+  }
+  Out << "],";
+
+  Out << "\n}\n";
 }
 
 #include <iostream>
