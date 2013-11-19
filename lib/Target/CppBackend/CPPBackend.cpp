@@ -1161,7 +1161,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   case Instruction::Ret: {
     const ReturnInst* ret =  cast<ReturnInst>(I);
     Value *RV = ret->getReturnValue();
-    text = "STACKTOP = sp;\n";
+    text = "STACKTOP = sp;";
     text += "return";
     if (RV == NULL) {
       text += ";";
@@ -1731,7 +1731,7 @@ void CppWriter::printFunctionBody(const Function *F) {
     std::string contents = "";
     for (BasicBlock::const_iterator I = BI->begin(), E = BI->end();
          I != E; ++I) {
-      contents += generateInstruction(I) + "\n";
+      contents += " " + generateInstruction(I) + "\n";
     }
     Block *Curr = new Block(contents.c_str());
     const BasicBlock *BB = &*BI;
@@ -1774,7 +1774,7 @@ void CppWriter::printFunctionBody(const Function *F) {
 
   // Emit local variables
   if (!UsedVars.empty()) {
-    Out << "var ";
+    Out << " var ";
     for (VarMap::iterator VI = UsedVars.begin(); VI != UsedVars.end(); ++VI) {
       if (VI != UsedVars.begin()) {
         Out << ", ";
@@ -1799,7 +1799,7 @@ void CppWriter::printFunctionBody(const Function *F) {
   }
 
   // Emit stack entry
-  Out << getAssign("sp", Type::getInt32Ty(F->getContext())) + "STACKTOP;";
+  Out << " " + getAssign("sp", Type::getInt32Ty(F->getContext())) + "STACKTOP;";
 
   // Emit (relooped) code
   nl(Out) << buffer;
