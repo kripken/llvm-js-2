@@ -1719,7 +1719,7 @@ void CppWriter::printFunctionBody(const Function *F) {
   }
 
   // Prepare relooper
-  static char *buffer = new char[10*1024*1024]; // XXX
+  static char *buffer = new char[10*1024*1024]; // XXX upgrade relooper, get size management and assertions etc etc XXX also statically allocate this
   Relooper::SetOutputBuffer(buffer);
   Relooper R;
   Block *Entry = NULL;
@@ -1771,7 +1771,8 @@ void CppWriter::printFunctionBody(const Function *F) {
   // Calculate relooping and print
   R.Calculate(Entry);
   R.Render();
-  std::string text = getAssign("sp", Type::getInt32Ty(F->getContext())) + "STACKTOP;";
+
+  // Emit local variables
   if (!UsedVars.empty()) {
     Out << "var ";
     for (VarMap::iterator VI = UsedVars.begin(); VI != UsedVars.end(); ++VI) {
@@ -1787,6 +1788,7 @@ void CppWriter::printFunctionBody(const Function *F) {
           Out << "0";
           break;
         case Type::FloatTyID:
+          // TODO Out << "Math_fround(0)";
         case Type::DoubleTyID:
           Out << "0.0";
           break;
@@ -1795,8 +1797,13 @@ void CppWriter::printFunctionBody(const Function *F) {
     Out << ";";
     nl(Out);
   }
-  Out << text;
+
+  // Emit stack entry
+  Out << getAssign("sp", Type::getInt32Ty(F->getContext())) + "STACKTOP;";
+
+  // Emit (relooped) code
   nl(Out) << buffer;
+  free(buffer); // XXX
 
   // Loop over the ForwardRefs and resolve them now that all instructions
   // are generated.
