@@ -2089,7 +2089,7 @@ bool CppWriter::runOnModule(Module &M) {
   TheModule = &M;
 
   // Emit a header
-  Out << "//\n\n";
+  Out << "//========================================\n\n";
 
   // Get the name of the function we're supposed to generate
   std::string fname = FuncName.getValue();
