@@ -756,6 +756,7 @@ std::string CppWriter::getCast(const StringRef &s, const Type *t) {
     default:
       assert(false && "Unsupported type");
     case Type::FloatTyID:
+      // TODO return ("Math_fround(" + s + ")").str();
     case Type::DoubleTyID:
       return ("+" + s).str();
     case Type::IntegerTyID:
