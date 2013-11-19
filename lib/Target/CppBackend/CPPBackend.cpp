@@ -1697,8 +1697,7 @@ void CppWriter::printFunctionHead(const Function* F) {
 }
 
 void CppWriter::printFunctionBody(const Function *F) {
-  if (F->isDeclaration())
-    return; // external functions have no bodies.
+  assert(!F->isDeclaration());
 
   // Clear the DefinedValues and ForwardRefs maps because we can't have
   // cross-function forward refs
