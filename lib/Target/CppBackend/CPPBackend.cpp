@@ -1119,7 +1119,7 @@ std::string CppWriter::getPtr(const Value* Ptr) {
 }
 
 std::string CppWriter::getConstant(const Constant* CV) {
-  if (const PointerType *Ptr = dyn_cast<PointerType>(CV->getType())) {
+  if (/* const PointerType *Ptr = */ dyn_cast<PointerType>(CV->getType())) {
     return getPtr(CV);
   } else {
     if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
@@ -1973,18 +1973,18 @@ void CppWriter::allocateConstant(const Constant* CV) {
     for (unsigned i = 0; i < BitWidth / 8; ++i) {
       GlobalData->push_back(integer.b[i]);
     }
-  } else if (const ConstantPointerNull *CPN = dyn_cast<ConstantPointerNull>(CV)) {
+  } else if (/* const ConstantPointerNull *CPN = */ dyn_cast<ConstantPointerNull>(CV)) {
     assert(false);
-  } else if (const ConstantAggregateZero *CAZ = dyn_cast<ConstantAggregateZero>(CV)) {
+  } else if (/* const ConstantAggregateZero *CAZ = */ dyn_cast<ConstantAggregateZero>(CV)) {
     printf("Warning: ignoring CAZ\n");
     //Constant *C = CAZ->getSequentialElement();
-  } else if (const ConstantArray *CA = dyn_cast<ConstantArray>(CV)) {
+  } else if (/* const ConstantArray *CA = */ dyn_cast<ConstantArray>(CV)) {
     assert(false);
-  } else if (const ConstantStruct *CS = dyn_cast<ConstantStruct>(CV)) {
+  } else if (/* const ConstantStruct *CS = */ dyn_cast<ConstantStruct>(CV)) {
     assert(false);
-  } else if (const ConstantVector *CVec = dyn_cast<ConstantVector>(CV)) {
+  } else if (/* const ConstantVector *CVec = */ dyn_cast<ConstantVector>(CV)) {
     assert(false);
-  } else if (const BlockAddress *BA = dyn_cast<BlockAddress>(CV)) {
+  } else if (/* const BlockAddress *BA = */ dyn_cast<BlockAddress>(CV)) {
     assert(false);
   } else if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(CV)) {
     if (CE->getOpcode() == Instruction::GetElementPtr) {
@@ -1994,7 +1994,7 @@ void CppWriter::allocateConstant(const Constant* CV) {
     } else {
         assert(false);
     }
-  } else if (const UndefValue *UV = dyn_cast<UndefValue>(CV)) {
+  } else if (/* const UndefValue *UV = */ dyn_cast<UndefValue>(CV)) {
     assert(false);
   } else {
     std::cout << getCppName(CV) << std::endl;
