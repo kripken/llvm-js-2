@@ -1899,7 +1899,7 @@ void CppWriter::printModuleBody() {
   Out << "\n\n// EMSCRIPTEN_METADATA\n";
   Out << "{\n";
 
-  Out << "declares: [";
+  Out << "\"declares\": [";
   bool first = false;
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
        I != E; ++I) {
@@ -1911,7 +1911,7 @@ void CppWriter::printModuleBody() {
       Out << "\"" + I->getName() + "\"";
     }
   }
-  Out << "],";
+  Out << "]";
 
   Out << "\n}\n";
 }
