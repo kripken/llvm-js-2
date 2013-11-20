@@ -1855,7 +1855,7 @@ void CppWriter::printModuleBody() {
   printConstants(TheModule);
 
   // Emit function bodies.
-  nl(Out) << "// Function Definitions"; nl(Out);
+  nl(Out) << "// EMSCRIPTEN_START_FUNCTIONS"; nl(Out);
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
        I != E; ++I) {
     if (!I->isDeclaration()) {
@@ -1880,8 +1880,7 @@ void CppWriter::printModuleBody() {
       nl(Out);
     }
   }
-
-  nl(Out);
+  Out << "// EMSCRIPTEN_END_FUNCTIONS\n\n";
 
   // TODO fix commas
   Out << "/* memory initializer */ allocate([";
