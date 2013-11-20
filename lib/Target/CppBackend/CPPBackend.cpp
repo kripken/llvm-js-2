@@ -1881,10 +1881,10 @@ void CppWriter::printModuleBody() {
     }
   }
 
-  nl(Out) << "// Memory allocation"; nl(Out);
+  nl(Out);
 
   // TODO fix commas
-  Out << "allocate([";
+  Out << "/* memory initializer */ allocate([";
   printCommaSeparated(GlobalData64);
   if (GlobalData64.size() > 0 && GlobalData32.size() > 0) {
     Out << ",";
@@ -1894,7 +1894,7 @@ void CppWriter::printModuleBody() {
     Out << ",";
   }
   printCommaSeparated(GlobalData8);
-  Out << "], 'i8', ALLOC_NONE, Runtime.GLOBAL_BASE);";
+  Out << "], \"i8\", ALLOC_NONE, Runtime.GLOBAL_BASE);";
 
   // Emit metadata for emcc driver
   Out << "\n\n// EM_METADATA\n";
