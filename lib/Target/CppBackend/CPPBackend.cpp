@@ -1897,7 +1897,7 @@ void CppWriter::printModuleBody() {
   Out << "], \"i8\", ALLOC_NONE, Runtime.GLOBAL_BASE);";
 
   // Emit metadata for emcc driver
-  Out << "\n\n// EM_METADATA\n";
+  Out << "\n\n// EMSCRIPTEN_METADATA\n";
   Out << "{\n";
 
   Out << "declares: [";
