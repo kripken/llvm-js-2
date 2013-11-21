@@ -1863,10 +1863,8 @@ void CppWriter::printModuleBody() {
       Out << "function _" << I->getName() << "(";
       for (Function::const_arg_iterator AI = I->arg_begin(), AE = I->arg_end();
            AI != AE; ++AI) {
+        if (AI != I->arg_begin()) Out << ",";
         Out << getCppName(AI);
-        if (AI != I->arg_begin()) {
-          Out << ", ";
-        }
       }
       Out << ") {";
       nl(Out);
