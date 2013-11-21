@@ -1264,7 +1264,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     //Out << "BinaryOperator* " << iName << " = BinaryOperator::Create(";
     text = getAssign(iName, Type::getInt32Ty(I->getContext()));
     switch (I->getOpcode()) {
-    case Instruction::Add: text += getCast(opNames[0] + " + " + getValueAsStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
+    case Instruction::Add: text += getCast(getValueAsStr(I->getOperand(0)) + " + " + getValueAsStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
     case Instruction::FAdd: Out << "Instruction::FAdd"; break;
     case Instruction::Sub: Out << "Instruction::Sub"; break;
     case Instruction::FSub: Out << "Instruction::FSub"; break;
