@@ -166,6 +166,7 @@ namespace {
     std::string getPtr(const Value* Ptr);
     std::string getConstant(const Constant*);
     std::string getValueAsStr(const Value*);
+    std::string getValueAsParenStr(const Value*);
     std::string getCppName(Type* val);
     inline void printCppName(Type* val);
 
@@ -1149,6 +1150,10 @@ std::string CppWriter::getValueAsStr(const Value* V) {
   }
 }
 
+std::string CppWriter::getValueAsParenStr(const Value* V) {
+  return "(" + getValueAsStr(V) + ")";
+}
+
 // generateInstruction - This member is called for each Instruction in a function.
 std::string CppWriter::generateInstruction(const Instruction *I) {
   std::string text = "NYI: " + std::string(I->getOpcodeName());
@@ -1269,7 +1274,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     //Out << "BinaryOperator* " << iName << " = BinaryOperator::Create(";
     text = getAssign(iName, Type::getInt32Ty(I->getContext()));
     switch (I->getOpcode()) {
-    case Instruction::Add: text += getParenCast(getValueAsStr(I->getOperand(0)) + " + " + getValueAsStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
+    case Instruction::Add: text += getParenCast(getValueAsParenStr(I->getOperand(0)) + " + " + getValueAsParenStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
     case Instruction::FAdd: Out << "Instruction::FAdd"; break;
     case Instruction::Sub: Out << "Instruction::Sub"; break;
     case Instruction::FSub: Out << "Instruction::FSub"; break;
