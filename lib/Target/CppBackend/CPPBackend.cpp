@@ -178,6 +178,7 @@ namespace {
 
     std::string getAssign(const StringRef &, const Type *);
     std::string getCast(const StringRef &, const Type *);
+    std::string getParenCast(const StringRef &, const Type *);
 
     void printConstant(const Constant *CPV);
     void printConstants(const Module* M);
@@ -756,17 +757,21 @@ std::string CppWriter::getAssign(const StringRef &s, const Type *t) {
 }
 
 std::string CppWriter::getCast(const StringRef &s, const Type *t) {
-    switch (t->getTypeID()) {
-    default:
-      assert(false && "Unsupported type");
-    case Type::FloatTyID:
-      // TODO return ("Math_fround(" + s + ")").str();
-    case Type::DoubleTyID:
-      return ("+" + s).str();
-    case Type::IntegerTyID:
-    case Type::PointerTyID:
-      return (s + "|0").str();
-    }
+  switch (t->getTypeID()) {
+  default:
+    assert(false && "Unsupported type");
+  case Type::FloatTyID:
+    // TODO return ("Math_fround(" + s + ")").str();
+  case Type::DoubleTyID:
+    return ("+" + s).str();
+  case Type::IntegerTyID:
+  case Type::PointerTyID:
+    return (s + "|0").str();
+  }
+}
+
+std::string CppWriter::getParenCast(const StringRef &s, const Type *t) {
+  return getCast(("(" + s + ")").str(), t);
 }
 
 // printConstant - Print out a constant pool entry...
@@ -1264,12 +1269,12 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     //Out << "BinaryOperator* " << iName << " = BinaryOperator::Create(";
     text = getAssign(iName, Type::getInt32Ty(I->getContext()));
     switch (I->getOpcode()) {
-    case Instruction::Add: text += getCast(getValueAsStr(I->getOperand(0)) + " + " + getValueAsStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
+    case Instruction::Add: text += getParenCast(getValueAsStr(I->getOperand(0)) + " + " + getValueAsStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
     case Instruction::FAdd: Out << "Instruction::FAdd"; break;
     case Instruction::Sub: Out << "Instruction::Sub"; break;
     case Instruction::FSub: Out << "Instruction::FSub"; break;
     case Instruction::Mul: Out << "Instruction::Mul"; break;
-    case Instruction::FMul: text += getCast(getValueAsStr(I->getOperand(0)) + " * " + getValueAsStr(I->getOperand(1)), I->getType()) + ";"; break;
+    case Instruction::FMul: text += getParenCast(getValueAsStr(I->getOperand(0)) + " * " + getValueAsStr(I->getOperand(1)), I->getType()) + ";"; break;
     case Instruction::UDiv:Out << "Instruction::UDiv"; break;
     case Instruction::SDiv:Out << "Instruction::SDiv"; break;
     case Instruction::FDiv:Out << "Instruction::FDiv"; break;
