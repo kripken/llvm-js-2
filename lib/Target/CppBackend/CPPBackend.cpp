@@ -1899,12 +1899,13 @@ void CppWriter::printModuleBody() {
   Out << "{\n";
 
   Out << "\"declares\": [";
-  bool first = false;
+  bool first = true;
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
        I != E; ++I) {
     if (I->isDeclaration()) {
       if (first) {
         first = false;
+      } else {
         Out << ", ";
       }
       Out << "\"" + I->getName() + "\"";
@@ -1912,12 +1913,13 @@ void CppWriter::printModuleBody() {
   }
   Out << "],";
   Out << "\"implementedFunctions\": [";
-  first = false;
+  first = true;
   for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
        I != E; ++I) {
     if (!I->isDeclaration()) {
       if (first) {
         first = false;
+      } else {
         Out << ", ";
       }
       Out << "\"_" << I->getName() << '"';
