@@ -1269,7 +1269,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     case Instruction::Sub: Out << "Instruction::Sub"; break;
     case Instruction::FSub: Out << "Instruction::FSub"; break;
     case Instruction::Mul: Out << "Instruction::Mul"; break;
-    case Instruction::FMul: Out << "Instruction::FMul"; break;
+    case Instruction::FMul: text += getCast(getValueAsStr(I->getOperand(0)) + " * " + getValueAsStr(I->getOperand(1)), I->getType()) + ";"; break;
     case Instruction::UDiv:Out << "Instruction::UDiv"; break;
     case Instruction::SDiv:Out << "Instruction::SDiv"; break;
     case Instruction::FDiv:Out << "Instruction::FDiv"; break;
@@ -1410,9 +1410,9 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     case Instruction::FPToUI:   Out << "FPToUIInst"; break;
     case Instruction::FPToSI:   Out << "FPToSIInst"; break;
     case Instruction::UIToFP:   Out << "UIToFPInst"; break;
-    case Instruction::SIToFP:   Out << "SIToFPInst"; break;
     case Instruction::PtrToInt: Out << "PtrToIntInst"; break;
     case Instruction::IntToPtr: Out << "IntToPtrInst"; break;
+    case Instruction::SIToFP:
     case Instruction::BitCast:  text = getAssign(iName, I->getOperand(0)->getType()) + getValueAsStr(I->getOperand(0)) + ";"; break;
     default: llvm_unreachable("Unreachable");
     }
