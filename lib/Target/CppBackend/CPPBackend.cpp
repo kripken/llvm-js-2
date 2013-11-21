@@ -1426,10 +1426,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
       if (t && (GV = dyn_cast<GlobalVariable>(Arg))) {
         text += utostr(getGlobalAddress(GV->getName().str()));
       } else {
-        text += opNames[i];
-        if (Arg->getType()->isIntegerTy() || Arg->getType()->isPointerTy()) {
-          text += "|0";
-        }
+        text += getValueAsStr(call->getArgOperand(i));
       }
       if (i < numArgs - 1) text += ", ";
     }
