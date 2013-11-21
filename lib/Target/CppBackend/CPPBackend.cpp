@@ -1773,6 +1773,7 @@ void CppWriter::printFunctionBody(const Function *F) {
   R.Render();
 
   // Emit local variables
+  UsedVars["sp"] = Type::getInt32Ty(F->getContext())->getTypeID();
   if (!UsedVars.empty()) {
     Out << " var ";
     for (VarMap::iterator VI = UsedVars.begin(); VI != UsedVars.end(); ++VI) {
