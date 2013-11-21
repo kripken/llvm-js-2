@@ -103,7 +103,7 @@ namespace {
     NameSet UsedNames;
     TypeSet DefinedTypes;
     ValueSet DefinedValues;
-    VarMap UsedVars;
+    VarMap UsedVars; // XXX this should be per-function, not per-module. needs clearings
     ForwardRefMap ForwardRefs;
     bool is_inline;
     unsigned indent_level;
@@ -1435,7 +1435,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     }
     text += ")";
     if (!RT->isVoidTy()) {
-      text = getAssign(call->getName(), RT) + getCast(text, RT);
+      text = getAssign(iName, RT) + getCast(text, RT);
     }
     text += ";";
     break;
