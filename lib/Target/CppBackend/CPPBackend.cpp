@@ -209,8 +209,8 @@ formatted_raw_ostream &CppWriter::nl(formatted_raw_ostream &Out, int delta) {
 }
 
 static inline void sanitize(std::string &str) {
-  for (size_t i = 0; i < str.length(); ++i)
-    if (!isalnum(str[i]) && str[i] != '_')
+  for (size_t i = 1; i < str.length(); ++i)
+    if (!isalnum(str[i]) && str[i] != '_' && str[i] != '$')
       str[i] = '_';
 }
 
@@ -457,10 +457,14 @@ std::string CppWriter::getCppName(const Value* val) {
   std::string name;
   ValueMap::iterator I = ValueNames.find(val);
   if (I != ValueNames.end() && I->first == val)
-    return  I->second;
+    return I->second;
 
   if (val->hasName()) {
-    name = std::string("_") + val->getName().str();
+    if (dyn_cast<Function>(val)) {
+      name = std::string("_") + val->getName().str();
+    } else {
+      name = std::string("$") + val->getName().str();
+    }
     sanitize(name);
   } else {
     if (const GlobalVariable* GV = dyn_cast<GlobalVariable>(val)) {
