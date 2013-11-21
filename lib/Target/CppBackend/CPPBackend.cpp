@@ -1912,6 +1912,19 @@ void CppWriter::printModuleBody() {
       Out << "\"" + I->getName() + "\"";
     }
   }
+  Out << "],";
+  Out << "\"implementedFunctions\": [";
+  first = false;
+  for (Module::const_iterator I = TheModule->begin(), E = TheModule->end();
+       I != E; ++I) {
+    if (!I->isDeclaration()) {
+      if (first) {
+        first = false;
+        Out << ", ";
+      }
+      Out << "\"_" << I->getName() << '"';
+    }
+  }
   Out << "]";
 
   Out << "\n}\n";
