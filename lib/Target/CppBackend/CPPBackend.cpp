@@ -103,7 +103,7 @@ namespace {
     NameSet UsedNames;
     TypeSet DefinedTypes;
     ValueSet DefinedValues;
-    VarMap UsedVars; // XXX this should be per-function, not per-module. needs clearings
+    VarMap UsedVars;
     ForwardRefMap ForwardRefs;
     bool is_inline;
     unsigned indent_level;
@@ -1714,6 +1714,8 @@ void CppWriter::printFunctionBody(const Function *F) {
   // cross-function forward refs
   ForwardRefs.clear();
   DefinedValues.clear();
+
+  UsedVars.clear();
 
   // Create all the argument values
   if (!is_inline) {
