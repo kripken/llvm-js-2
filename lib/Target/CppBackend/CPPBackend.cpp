@@ -1884,7 +1884,7 @@ void CppWriter::printModuleBody() {
       for (Function::const_arg_iterator AI = I->arg_begin(), AE = I->arg_end();
            AI != AE; ++AI) {
         std::string name = getCppName(AI);
-        Out << name << " = " << getCast(name, AI->getType()) << ";";
+        Out << " " << name << " = " << getCast(name, AI->getType()) << ";";
         nl(Out);
       }
       printFunctionBody(I);
