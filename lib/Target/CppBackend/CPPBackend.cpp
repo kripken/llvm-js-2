@@ -1730,8 +1730,9 @@ void CppWriter::printFunctionBody(const Function *F) {
   }
 
   // Prepare relooper
-  static char *buffer = new char[10*1024*1024]; // XXX upgrade relooper, get size management and assertions etc etc XXX also statically allocate this
-  Relooper::SetOutputBuffer(buffer);
+  #define RELOOPER_BUFFER 10*1024*1024
+  static char *buffer = new char[RELOOPER_BUFFER];
+  Relooper::SetOutputBuffer(buffer, RELOOPER_BUFFER);
   Relooper R;
   Block *Entry = NULL;
   std::map<const BasicBlock*, Block*> LLVMToRelooper;
@@ -1744,7 +1745,7 @@ void CppWriter::printFunctionBody(const Function *F) {
          I != E; ++I) {
       contents += " " + generateInstruction(I) + "\n";
     }
-    Block *Curr = new Block(contents.c_str());
+    Block *Curr = new Block(contents.c_str(), NULL); // TODO: use branch vars so we get switches
     const BasicBlock *BB = &*BI;
     LLVMToRelooper[BB] = Curr;
     R.AddBlock(Curr);
