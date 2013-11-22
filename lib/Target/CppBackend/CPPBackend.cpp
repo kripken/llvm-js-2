@@ -1276,7 +1276,7 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
     switch (I->getOpcode()) {
     case Instruction::Add: text += getParenCast(getValueAsParenStr(I->getOperand(0)) + " + " + getValueAsParenStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
     case Instruction::FAdd: Out << "Instruction::FAdd"; break;
-    case Instruction::Sub: Out << "Instruction::Sub"; break;
+    case Instruction::Sub: text += getParenCast(getValueAsParenStr(I->getOperand(0)) + " - " + getValueAsParenStr(I->getOperand(1)), Type::getInt32Ty(I->getContext())) + ";"; break;
     case Instruction::FSub: Out << "Instruction::FSub"; break;
     case Instruction::Mul: Out << "Instruction::Mul"; break;
     case Instruction::FMul: text += getParenCast(getValueAsStr(I->getOperand(0)) + " * " + getValueAsStr(I->getOperand(1)), I->getType()) + ";"; break;
