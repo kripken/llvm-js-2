@@ -38,6 +38,8 @@
 #include <set>
 using namespace llvm;
 
+#define dump(x, ...) fprintf(stderr, x, __VA_ARGS__)
+
 #include <Relooper.h>
 
 static cl::opt<std::string>
@@ -1133,7 +1135,10 @@ std::string CppWriter::getConstant(const Constant* CV) {
     return getPtr(CV);
   } else {
     if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
-      return ftostr(CFP->getValueAPF());
+      std::string S = ftostr(CFP->getValueAPF());
+      S = '+' + S;
+//      if (S.find('.') == S.npos) { TODO: do this when necessary, but it is necessary even for 0.0001
+      return S;
     } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(CV)) {
       return CI->getValue().toString(10, true);
     } else {
