@@ -1819,7 +1819,7 @@ void CppWriter::printFunctionBody(const Function *F) {
         case Type::FloatTyID:
           // TODO Out << "Math_fround(0)";
         case Type::DoubleTyID:
-          Out << "0.0";
+          Out << "+0"; // FIXME
           break;
       }
     }
