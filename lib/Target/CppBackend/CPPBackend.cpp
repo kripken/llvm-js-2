@@ -1729,7 +1729,7 @@ void CppWriter::printFunctionBody(const Function *F) {
     }
   }
 
-  // Prepare relooper
+  // Prepare relooper TODO: resize buffer as needed
   #define RELOOPER_BUFFER 10*1024*1024
   static char *buffer = new char[RELOOPER_BUFFER];
   Relooper::SetOutputBuffer(buffer, RELOOPER_BUFFER);
@@ -1816,7 +1816,6 @@ void CppWriter::printFunctionBody(const Function *F) {
 
   // Emit (relooped) code
   nl(Out) << buffer;
-  free(buffer); // XXX
 
   // Loop over the ForwardRefs and resolve them now that all instructions
   // are generated.
