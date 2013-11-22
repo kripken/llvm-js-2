@@ -1365,7 +1365,16 @@ std::string CppWriter::generateInstruction(const Instruction *I) {
   }
   case Instruction::Store: {
     const StoreInst *SI = cast<StoreInst>(I);
-    text = getPtrUse(SI->getPointerOperand()) + " = " + getValueAsStr(SI->getValueOperand()) + ";";
+    const Value *P = SI->getPointerOperand();
+    const Value *V = SI->getValueOperand();
+    std::string VS = getValueAsStr(V);
+    if (V->getType()->isDoubleTy() && SI->getAlignment() == 4) {
+      // only 4-byte aligned, copy carefully
+      std::string PS = getOpName(P);
+      text = "HEAPF64[tempDoublePtr>>3]=" + VS + ";HEAPF32[" + PS + ">>2]=HEAPF32[tempDoublePtr>>2];HEAPF32[" + PS + "+4>>2]=HEAPF32[tempDoublePtr+4>>2];";
+    } else {
+      text = getPtrUse(P) + " = " + VS + ";";
+    }
     break;
   }
   case Instruction::GetElementPtr: {
